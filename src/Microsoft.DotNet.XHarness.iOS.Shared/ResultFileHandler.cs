@@ -192,99 +192,117 @@ public class ResultFileHandler : IResultFileHandler
         var privateTempRoot = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "xharness", "tmp");
         Directory.CreateDirectory(privateTempRoot);
         string tempCrashListFile = Path.Combine(privateTempRoot, Path.GetRandomFileName() + ".txt");
+        bool deleteTempCrashListFile = true;
+        bool deleteCrashReportContent = false;
 
-        MlaunchArguments listArgs = new MlaunchArguments(new ListCrashReportsArgument(tempCrashListFile));
+        string? crashReportContent = null;
 
-        if (!string.IsNullOrEmpty(deviceName))
+        try
         {
-            listArgs.Add(new DeviceNameArgument(deviceName));
+            MlaunchArguments listArgs = new MlaunchArguments(new ListCrashReportsArgument(tempCrashListFile));
+
+            if (!string.IsNullOrEmpty(deviceName))
+            {
+                listArgs.Add(new DeviceNameArgument(deviceName));
+            }
+
+            ProcessExecutionResult listResult = await _processManager.ExecuteCommandAsync(
+                listArgs,
+                _mainLog,
+                TimeSpan.FromMinutes(1));
+
+            if (!listResult.Succeeded || !File.Exists(tempCrashListFile))
+            {
+                _mainLog.WriteLine("Failed to list crash reports from device.");
+                return;
+            }
+
+            FilePayloadSecurity.ThrowIfFileExceedsMaxBytes(
+                tempCrashListFile,
+                nameof(tempCrashListFile),
+                FilePayloadSecurity.DefaultMaxCrashListFileBytes);
+
+            List<string> crashReports = File.ReadAllLines(tempCrashListFile)
+                .Where(line => !string.IsNullOrWhiteSpace(line))
+                .ToList();
+
+            if (crashReports.Count == 0)
+            {
+                _mainLog.WriteLine("No crash reports found on device.");
+                return;
+            }
+
+            // Filter for crash reports that might be related to our app
+            // .ips files typically follow the format: AppName-YYYY-MM-DD-HHMMSS.ips or similar
+            List<string> appRelatedCrashes = crashReports
+                .Where(crash => crash.Contains(appInformation.AppName, StringComparison.OrdinalIgnoreCase) ||
+                                crash.EndsWith(".ips", StringComparison.OrdinalIgnoreCase))
+                .ToList();
+
+            // Use the last crash report (most recent) from the filtered list
+            string latestCrashReport = (appRelatedCrashes.Count > 0 ? appRelatedCrashes : crashReports).Last();
+
+            _mainLog.WriteLine($"Found crash report: {latestCrashReport}");
+
+            // Download the crash report
+            string? uploadRoot = Environment.GetEnvironmentVariable("HELIX_WORKITEM_UPLOAD_ROOT");
+
+            if (!string.IsNullOrEmpty(uploadRoot) && Directory.Exists(uploadRoot))
+            {
+                string crashFileName = Path.GetFileName(latestCrashReport);
+                crashReportContent = Path.Combine(uploadRoot, crashFileName);
+            }
+            else
+            {
+                var privateTempRoot2 = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "xharness", "tmp");
+                Directory.CreateDirectory(privateTempRoot2);
+                crashReportContent = Path.Combine(privateTempRoot2, Path.GetRandomFileName() + ".txt");
+                deleteCrashReportContent = true;
+            }
+
+            MlaunchArguments downloadArgs = new MlaunchArguments(
+                new DownloadCrashReportArgument(latestCrashReport),
+                new DownloadCrashReportToArgument(crashReportContent));
+
+            if (!string.IsNullOrEmpty(deviceName))
+            {
+                downloadArgs.Add(new DeviceNameArgument(deviceName));
+            }
+
+            ProcessExecutionResult downloadResult = await _processManager.ExecuteCommandAsync(
+                downloadArgs,
+                _mainLog,
+                TimeSpan.FromMinutes(1));
+
+            if (!downloadResult.Succeeded || !File.Exists(crashReportContent))
+            {
+                _mainLog.WriteLine("Failed to download crash report from device.");
+                return;
+            }
+
+            HostPathSecurity.ThrowIfUnsafeHostPath(crashReportContent, nameof(crashReportContent));
+            FilePayloadSecurity.ThrowIfFileExceedsMaxBytes(
+                crashReportContent,
+                nameof(crashReportContent),
+                FilePayloadSecurity.DefaultMaxCrashReportTextBytes);
+
+            // Dump the crash report content to the log
+            _mainLog.WriteLine($"==================== Crash report ====================");
+            _mainLog.WriteLine($"Crash report file: {crashReportContent}");
+            string crashContent = await File.ReadAllTextAsync(crashReportContent);
+            _mainLog.WriteLine(crashContent);
+            _mainLog.WriteLine($"==================== End of Crash report ====================");
         }
-
-        ProcessExecutionResult listResult = await _processManager.ExecuteCommandAsync(
-            listArgs,
-            _mainLog,
-            TimeSpan.FromMinutes(1));
-
-        if (!listResult.Succeeded || !File.Exists(tempCrashListFile))
+        finally
         {
-            _mainLog.WriteLine("Failed to list crash reports from device.");
-            return;
+            if (deleteTempCrashListFile)
+            {
+                try { File.Delete(tempCrashListFile); } catch { }
+            }
+            if (deleteCrashReportContent && crashReportContent != null)
+            {
+                try { File.Delete(crashReportContent); } catch { }
+            }
         }
-
-        FilePayloadSecurity.ThrowIfFileExceedsMaxBytes(
-            tempCrashListFile,
-            nameof(tempCrashListFile),
-            FilePayloadSecurity.DefaultMaxCrashListFileBytes);
-
-        List<string> crashReports = File.ReadAllLines(tempCrashListFile)
-            .Where(line => !string.IsNullOrWhiteSpace(line))
-            .ToList();
-
-        if (crashReports.Count == 0)
-        {
-            _mainLog.WriteLine("No crash reports found on device.");
-            return;
-        }
-
-        // Filter for crash reports that might be related to our app
-        // .ips files typically follow the format: AppName-YYYY-MM-DD-HHMMSS.ips or similar
-        List<string> appRelatedCrashes = crashReports
-            .Where(crash => crash.Contains(appInformation.AppName, StringComparison.OrdinalIgnoreCase) ||
-                            crash.EndsWith(".ips", StringComparison.OrdinalIgnoreCase))
-            .ToList();
-
-        // Use the last crash report (most recent) from the filtered list
-        string latestCrashReport = (appRelatedCrashes.Count > 0 ? appRelatedCrashes : crashReports).Last();
-
-        _mainLog.WriteLine($"Found crash report: {latestCrashReport}");
-
-        // Download the crash report
-        string? uploadRoot = Environment.GetEnvironmentVariable("HELIX_WORKITEM_UPLOAD_ROOT");
-        string crashReportContent;
-
-        if (!string.IsNullOrEmpty(uploadRoot) && Directory.Exists(uploadRoot))
-        {
-            string crashFileName = Path.GetFileName(latestCrashReport);
-            crashReportContent = Path.Combine(uploadRoot, crashFileName);
-        }
-        else
-        {
-            var privateTempRoot2 = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "xharness", "tmp");
-            Directory.CreateDirectory(privateTempRoot2);
-            crashReportContent = Path.Combine(privateTempRoot2, Path.GetRandomFileName() + ".txt");
-        }
-
-        MlaunchArguments downloadArgs = new MlaunchArguments(
-            new DownloadCrashReportArgument(latestCrashReport),
-            new DownloadCrashReportToArgument(crashReportContent));
-
-        if (!string.IsNullOrEmpty(deviceName))
-        {
-            downloadArgs.Add(new DeviceNameArgument(deviceName));
-        }
-
-        ProcessExecutionResult downloadResult = await _processManager.ExecuteCommandAsync(
-            downloadArgs,
-            _mainLog,
-            TimeSpan.FromMinutes(1));
-
-        if (!downloadResult.Succeeded || !File.Exists(crashReportContent))
-        {
-            _mainLog.WriteLine("Failed to download crash report from device.");
-            return;
-        }
-
-        HostPathSecurity.ThrowIfUnsafeHostPath(crashReportContent, nameof(crashReportContent));
-        FilePayloadSecurity.ThrowIfFileExceedsMaxBytes(
-            crashReportContent,
-            nameof(crashReportContent),
-            FilePayloadSecurity.DefaultMaxCrashReportTextBytes);
-
-        // Dump the crash report content to the log
-        _mainLog.WriteLine($"==================== Crash report ====================");
-        _mainLog.WriteLine($"Crash report file: {crashReportContent}");
-        string crashContent = await File.ReadAllTextAsync(crashReportContent);
-        _mainLog.WriteLine(crashContent);
-        _mainLog.WriteLine($"==================== End of Crash report ====================");
     }
 }

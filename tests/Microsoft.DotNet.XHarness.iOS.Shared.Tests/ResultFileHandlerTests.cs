@@ -254,6 +254,60 @@ public class ResultFileHandlerTests : IDisposable
     }
 
     [Fact]
+    public async Task CopyCrashReportAsync_DeletesTemporaryListAndContentFilesWhenNotInHelix()
+    {
+        string originalUploadRoot = Environment.GetEnvironmentVariable("HELIX_WORKITEM_UPLOAD_ROOT");
+        Environment.SetEnvironmentVariable("HELIX_WORKITEM_UPLOAD_ROOT", null);
+
+        string? listFilePath = null;
+        string? downloadPath = null;
+
+        try
+        {
+            Mock<IMlaunchProcessManager> pm = new Mock<IMlaunchProcessManager>();
+            Mock<IFileBackedLog> log = new Mock<IFileBackedLog>();
+            ResultFileHandler handler = CreateHandler(pm, log);
+
+            int callCount = 0;
+            pm.Setup(m => m.ExecuteCommandAsync(
+                    It.IsAny<MlaunchArguments>(),
+                    It.IsAny<ILog>(),
+                    It.IsAny<TimeSpan>(),
+                    It.IsAny<Dictionary<string, string>>(),
+                    It.IsAny<int>(),
+                    It.IsAny<CancellationToken?>()))
+                .Returns((MlaunchArguments args, ILog _, TimeSpan _, Dictionary<string, string> _, int _, CancellationToken? _) =>
+                {
+                    callCount++;
+                    if (callCount == 1)
+                    {
+                        listFilePath = GetArgumentValue(args, "list-crash-reports");
+                        File.WriteAllLines(listFilePath, new[] { "MyApp-2026-01-01.ips" });
+                    }
+                    else if (callCount == 2)
+                    {
+                        downloadPath = GetArgumentValue(args, "download-crash-report-to");
+                        File.WriteAllText(downloadPath, "crash");
+                    }
+
+                    return Task.FromResult(new ProcessExecutionResult { ExitCode = 0 });
+                });
+
+            var appInfo = new AppBundleInformation("MyApp", "com.example.myapp", "/tmp", "/tmp", supports32b: false);
+            await handler.CopyCrashReportAsync("device-udid", null, appInfo, log.Object, isSimulator: false);
+
+            Assert.NotNull(listFilePath);
+            Assert.NotNull(downloadPath);
+            Assert.False(File.Exists(listFilePath), "temp crash list file should be deleted");
+            Assert.False(File.Exists(downloadPath), "temp crash report content should be deleted");
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable("HELIX_WORKITEM_UPLOAD_ROOT", originalUploadRoot);
+        }
+    }
+
+    [Fact]
     public async Task CopyResultsAsync_WhenFirstAttemptFailsAndSecondSucceeds_ReturnsTrue()
     {
         Mock<IMlaunchProcessManager> pm = new Mock<IMlaunchProcessManager>();

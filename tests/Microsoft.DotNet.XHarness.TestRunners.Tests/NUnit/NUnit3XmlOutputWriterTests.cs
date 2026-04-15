@@ -63,6 +63,13 @@ public class NUnit3XmlOutputWriterTests : IDisposable
         Assert.Equal(1, runs.Count);
         var enviroment = doc.SelectNodes(".//environment");
         Assert.Equal(1, enviroment.Count);
+
+        var env = enviroment[0] as XmlElement;
+        Assert.NotNull(env);
+        Assert.False(env.HasAttribute("cwd"));
+        Assert.False(env.HasAttribute("machine-name"));
+        Assert.False(env.HasAttribute("user"));
+        Assert.False(env.HasAttribute("user-domain"));
     }
 
     [Fact]
@@ -89,6 +96,13 @@ public class NUnit3XmlOutputWriterTests : IDisposable
         Assert.Equal(1, runs.Count);
         var enviroment = doc.SelectNodes(".//environment");
         Assert.Equal(1, enviroment.Count);
+
+        var env = enviroment[0] as XmlElement;
+        Assert.NotNull(env);
+        Assert.False(env.HasAttribute("cwd"));
+        Assert.False(env.HasAttribute("machine-name"));
+        Assert.False(env.HasAttribute("user"));
+        Assert.False(env.HasAttribute("user-domain"));
     }
 
     public void Dispose()

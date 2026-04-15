@@ -64,4 +64,23 @@ public class ErrorPatternScannerTests : IDisposable
         }
         Assert.True(matchCount <= 500);
     }
+
+    [Fact]
+    public void IsError_WithManyRegexes_DoesNotSpinIndefinitely()
+    {
+        // Regression test for "pattern×line multiplication" attacks:
+        // enforce that scanning completes quickly even with many regexes.
+        using var sw = new StreamWriter(_patternsPath);
+        for (int i = 0; i < 500; i++)
+        {
+            sw.WriteLine("%^(a+)+$");
+        }
+        sw.Close();
+
+        var scanner = new ErrorPatternScanner(_patternsPath, NullLogger.Instance);
+        var started = DateTime.UtcNow;
+        // This line would be expensive for backtracking engines; we have NonBacktracking + a global budget.
+        scanner.IsError(new string('a', 5000) + "!", out _);
+        Assert.True((DateTime.UtcNow - started) < TimeSpan.FromSeconds(5));
+    }
 }

@@ -12,11 +12,13 @@ public class ErrorPatternScanner
 {
     private const int MaxRegexPatternLength = 100_000;
     private const int MaxCompiledRegexPatterns = 500;
+    private static readonly TimeSpan MaxTotalRegexMatchTime = TimeSpan.FromSeconds(2);
 
     private readonly ILogger _logger;
     private readonly List<string> _errorPatternStrings = new();
     private readonly List<Regex> _errorPatternRegexes = new();
     private readonly bool _empty;
+    private TimeSpan _remainingRegexBudget = MaxTotalRegexMatchTime;
 
     public ErrorPatternScanner(string patternsFile, ILogger logger)
     {
@@ -62,7 +64,16 @@ public class ErrorPatternScanner
                         }
                         try
                         {
-                            _errorPatternRegexes.Add(RegexSecurity.Create(pattern, RegexOptions.IgnoreCase));
+                            // User-supplied regex patterns: prefer NonBacktracking to avoid catastrophic backtracking.
+                            // Fallback to regular engine with timeout if unsupported.
+                            try
+                            {
+                                _errorPatternRegexes.Add(RegexSecurity.Create(pattern, RegexOptions.IgnoreCase | RegexOptions.NonBacktracking));
+                            }
+                            catch (NotSupportedException)
+                            {
+                                _errorPatternRegexes.Add(RegexSecurity.Create(pattern, RegexOptions.IgnoreCase));
+                            }
                         }
                         catch (Exception ex) when (ex is ArgumentException || ex is ArgumentNullException || ex is ArgumentOutOfRangeException)
                         {
@@ -93,7 +104,37 @@ public class ErrorPatternScanner
             return true;
         }
 
-        Regex? matchedRegex = _errorPatternRegexes.FirstOrDefault(regex => regex.IsMatch(line));
+        if (_errorPatternRegexes.Count == 0)
+        {
+            return false;
+        }
+
+        // Cumulative budget to prevent pattern×line multiplication DoS.
+        if (_remainingRegexBudget <= TimeSpan.Zero)
+        {
+            return false;
+        }
+
+        Regex? matchedRegex = null;
+        foreach (var regex in _errorPatternRegexes)
+        {
+            var sw = System.Diagnostics.Stopwatch.StartNew();
+            bool isMatch = regex.IsMatch(line);
+            sw.Stop();
+            _remainingRegexBudget -= sw.Elapsed;
+
+            if (_remainingRegexBudget <= TimeSpan.Zero)
+            {
+                _logger.LogWarning("ErrorPatternScanner: Regex match budget exhausted; skipping remaining regex checks.");
+                break;
+            }
+
+            if (isMatch)
+            {
+                matchedRegex = regex;
+                break;
+            }
+        }
         if (matchedRegex != null)
         {
             matchedPattern = matchedRegex.ToString();

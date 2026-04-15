@@ -12,5 +12,10 @@ internal static class WebServerKestrelLimits
     public static void ApplyTestResultsUploadCap(KestrelServerOptions options)
     {
         options.Limits.MaxRequestBodySize = WebServerTestResultsUpload.MaxRequestBodyBytes;
+
+        // Loopback-only server, but apply conservative HTTP/2 limits to reduce abuse surface.
+        options.Limits.Http2.MaxStreamsPerConnection = 16;
+        options.Limits.Http2.MaxFrameSize = 16 * 1024; // bytes
+        options.Limits.Http2.HeaderTableSize = 8 * 1024; // bytes
     }
 }

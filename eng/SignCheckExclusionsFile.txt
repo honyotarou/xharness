@@ -1,0 +1,5 @@
+# Signing validation exclusions for this repo.
+# Keep this file present to prevent PR-based validation bypasses.
+#
+# Format is Arcade signcheck exclusions file. Keep minimal; add entries only when necessary.
+

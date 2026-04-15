@@ -109,10 +109,6 @@ internal class NUnit3XmlOutputWriter : OutputWriter
         _xmlWriter.WriteAttributeString("clr-version", Environment.Version.ToString());
         _xmlWriter.WriteAttributeString("os-version", Environment.OSVersion.ToString());
         _xmlWriter.WriteAttributeString("platform", Environment.OSVersion.Platform.ToString());
-        _xmlWriter.WriteAttributeString("cwd", Environment.CurrentDirectory);
-        _xmlWriter.WriteAttributeString("machine-name", Environment.MachineName);
-        _xmlWriter.WriteAttributeString("user", Environment.UserName);
-        _xmlWriter.WriteAttributeString("user-domain", Environment.UserDomainName);
         _xmlWriter.WriteAttributeString("culture", CultureInfo.CurrentCulture.ToString());
         _xmlWriter.WriteAttributeString("uiculture", CultureInfo.CurrentUICulture.ToString());
 
