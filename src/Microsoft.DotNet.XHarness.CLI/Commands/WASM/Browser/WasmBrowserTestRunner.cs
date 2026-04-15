@@ -13,10 +13,11 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Web;
 using Microsoft.DotNet.XHarness.CLI.CommandArguments.Wasm;
+using Microsoft.DotNet.XHarness.CLI.Commands.LoopbackTestServer;
 using Microsoft.DotNet.XHarness.Common.CLI;
+using Microsoft.DotNet.XHarness.Common.Utilities;
 using Microsoft.Extensions.Logging;
 using OpenQA.Selenium;
-using OpenQA.Selenium.DevTools;
 using OpenQA.Selenium.Support.UI;
 
 using LogLevel = Microsoft.Extensions.Logging.LogLevel;
@@ -32,7 +33,8 @@ internal class WasmBrowserTestRunner
 
     // Messages from selenium prepend the url, and location where the message originated
     // Eg. `foo` becomes `http://localhost:8000/xyz.js 0:12 "foo"
-    static readonly Regex s_consoleLogRegex = new(@"^\s*[a-z]*://[^\s]+\s+\d+:\d+\s+""(.*)""\s*$", RegexOptions.Compiled);
+    static readonly Regex s_consoleLogRegex = RegexSecurity.Create(
+        @"^\s*[a-z]*://[^\s]+\s+\d+:\d+\s+""(.*)""\s*$");
 
     public WasmBrowserTestRunner(WasmTestBrowserCommandArguments arguments, IEnumerable<string> passThroughArguments,
                                         WasmTestMessagesProcessor messagesProcessor, ILogger logger)
@@ -58,7 +60,7 @@ internal class WasmBrowserTestRunner
             var consolePumpTcs = new TaskCompletionSource<bool>();
             var logProcessorTask = Task.Run(() => _messagesProcessor.RunAsync(cts.Token));
 
-            var webServerOptions = WebServer.TestWebServerOptions.FromArguments(_arguments);
+            var webServerOptions = WebServerOptions.FromArguments(_arguments);
             webServerOptions.ContentRoot = _arguments.AppPackagePath;
             webServerOptions.OnConsoleConnected = socket => RunConsoleMessagesPump(socket, cts.Token);
             ServerURLs serverURLs = await WebServer.Start(
@@ -68,22 +70,7 @@ internal class WasmBrowserTestRunner
 
             string testUrl = BuildUrl(serverURLs);
 
-            var devTools = driver as IDevTools;
-            // firefox does not support devtools protocol, we use websocket to push console logs from Firefox
-            if (devTools != null)
-            {
-                var session = devTools.CreateDevToolsSession();
-                await session.Console.Enable();
-                session.Console.MessageAdded += Console_MessageAdded;
-
-                void Console_MessageAdded(object? sender, OpenQA.Selenium.DevTools.Console.MessageAddedEventArgs e)
-                {
-                    var text = e.Message.Text;
-                    var match = s_consoleLogRegex.Match(Regex.Unescape(text));
-                    string msg = match.Success ? match.Groups[1].Value : text;
-                    _messagesProcessor.Invoke(msg);
-                }
-            }
+            // Console output is forwarded by the test page to the loopback server (/console websocket).
 
             cts.CancelAfter(_arguments.Timeout);
 
@@ -140,6 +127,7 @@ internal class WasmBrowserTestRunner
                 if (int.TryParse(testsDoneElement.Text, out var code))
                 {
                     var appExitCode = (ExitCode)Enum.ToObject(typeof(ExitCode), code);
+                    appExitCode = ValidateExitCodeAgainstLogs(appExitCode, logProcessorExitCode, _messagesProcessor.ForwardedExitCode, _messagesProcessor.LineThatMatchedErrorPattern);
                     if (logProcessorExitCode != ExitCode.SUCCESS)
                     {
                         _logger.LogInformation($"Application has finished with exit code {appExitCode}. But the log processor failed with {logProcessorExitCode}.");
@@ -167,6 +155,25 @@ internal class WasmBrowserTestRunner
                 cts.Cancel();
             }
         }
+    }
+
+    internal static ExitCode ValidateExitCodeAgainstLogs(ExitCode domExitCode, ExitCode logProcessorExitCode, int? forwardedExitCode, string? lineThatMatchedErrorPattern)
+    {
+        // Security: do not allow a forged DOM exit code to claim success if logs indicate failure.
+        if (domExitCode == ExitCode.SUCCESS)
+        {
+            if (!string.IsNullOrEmpty(lineThatMatchedErrorPattern))
+            {
+                return ExitCode.TESTS_FAILED;
+            }
+
+            if (forwardedExitCode.HasValue && forwardedExitCode.Value != 0)
+            {
+                return ExitCode.TESTS_FAILED;
+            }
+        }
+
+        return domExitCode;
     }
 
     private async Task RunConsoleMessagesPump(WebSocket socket, CancellationToken token)
@@ -240,6 +247,9 @@ internal class WasmBrowserTestRunner
                 sb.Append($"arg={HttpUtility.UrlEncode($"--setenv={envVariable}={serverURLs!.Https}")}");
             }
         }
+
+        // Do not pass the stateful session token via the URL query (would be visible to the page).
+        // Browser clients receive it as an HttpOnly cookie from the loopback server.
 
         foreach (var arg in _passThroughArguments)
         {

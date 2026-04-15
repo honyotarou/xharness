@@ -1,9 +1,10 @@
-﻿// Licensed to the .NET Foundation under one or more agreements.
+// Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 // See the LICENSE file in the project root for more information.
 using System;
 using System.Threading.Tasks;
 using System.IO;
+using Microsoft.DotNet.XHarness.Common.Utilities;
 
 #nullable enable
 namespace Microsoft.DotNet.XHarness.TestRunners.Common;
@@ -22,6 +23,7 @@ public abstract class iOSApplicationEntryPointBase : ApplicationEntryPoint
 
     public override async Task RunAsync()
     {
+        HostPathSecurity.ThrowIfUnsafeHostPath(TestsResultsFinalPath, nameof(TestsResultsFinalPath));
         var options = ApplicationOptions.Current;
 
         // On iOS 18 and later, transferring results over a TCP tunnel isn’t supported.

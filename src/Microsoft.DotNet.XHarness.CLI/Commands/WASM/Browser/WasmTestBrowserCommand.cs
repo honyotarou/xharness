@@ -1,4 +1,4 @@
-﻿// Licensed to the .NET Foundation under one or more agreements.
+// Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 // See the LICENSE file in the project root for more information.
 
@@ -166,7 +166,8 @@ internal class WasmTestBrowserCommand : XHarnessCommand<WasmTestBrowserCommandAr
 
         if (!string.IsNullOrEmpty(Arguments.BrowserLocation))
         {
-            options.BrowserExecutableLocation = Arguments.BrowserLocation;
+            // Selenium 4.41+: prefer BinaryLocation for Firefox.
+            options.BinaryLocation = Arguments.BrowserLocation;
             logger.LogInformation($"Using Firefox from {Arguments.BrowserLocation}");
         }
 
@@ -232,8 +233,7 @@ internal class WasmTestBrowserCommand : XHarnessCommand<WasmTestBrowserCommandAr
                     sessionLanguage,
                     options =>
                     {
-                        options.UseChromium = true;
-                        return EdgeDriverService.CreateDefaultServiceFromOptions(options);
+                        return EdgeDriverService.CreateDefaultService();
                     }, logger);
 
     private (DriverService, IWebDriver) GetChromiumDriver<TDriverOptions, TDriver, TDriverService>(
@@ -291,9 +291,8 @@ internal class WasmTestBrowserCommand : XHarnessCommand<WasmTestBrowserCommandAr
             "--metrics-recording-only"
         });
 
-        if (File.Exists("/.dockerenv") || Environment.GetEnvironmentVariable("DOTNET_RUNNING_IN_CONTAINER") == "true")
+        if (Arguments.AllowNoSandboxInContainer && (File.Exists("/.dockerenv") || Environment.GetEnvironmentVariable("DOTNET_RUNNING_IN_CONTAINER") == "true"))
         {
-            // Use --no-sandbox for containers (Linux Docker, Windows containers, and codespaces)
             options.AddArguments("--no-sandbox");
         }
 

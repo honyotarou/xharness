@@ -1,10 +1,11 @@
-﻿// Licensed to the .NET Foundation under one or more agreements.
+// Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 // See the LICENSE file in the project root for more information.
 
 using System;
 using System.IO;
 using System.Xml;
+using Microsoft.DotNet.XHarness.Common.Xml;
 
 #nullable enable
 namespace Microsoft.DotNet.XHarness.iOS.Shared.XmlResults;
@@ -14,15 +15,12 @@ public class NUnitV3ResultParser : IXmlResultParser
     public (string resultLine, bool failed) ParseXml(TextReader source, TextWriter? humanReadableOutput)
     {
         long testcasecount, passed, failed, inconclusive, skipped;
-        var failedTestRun = false; // result = "Failed"
         testcasecount = passed = failed = inconclusive = skipped = 0L;
+        long observedTotal = 0;
+        long observedFailed = 0;
+        long observedSkipped = 0;
 
-        var settings = new XmlReaderSettings
-        {
-            IgnoreWhitespace = true,
-            IgnoreComments = true,
-            IgnoreProcessingInstructions = true
-        };
+        var settings = SecureXmlReaderSettings.Create(ignoreWhitespace: true);
 
         using (var reader = XmlReader.Create(source, settings))
         {
@@ -35,7 +33,19 @@ public class NUnitV3ResultParser : IXmlResultParser
                     long.TryParse(reader["failed"], out failed);
                     long.TryParse(reader["inconclusive"], out inconclusive);
                     long.TryParse(reader["skipped"], out skipped);
-                    failedTestRun = failed != 0;
+                }
+                else if (reader.NodeType == XmlNodeType.Element && reader.Name == "test-case")
+                {
+                    observedTotal++;
+                    var status = reader["result"];
+                    if (status == "Failed" || status == "Error")
+                    {
+                        observedFailed++;
+                    }
+                    else if (status == "Skipped" || status == "Inconclusive")
+                    {
+                        observedSkipped++;
+                    }
                 }
 
                 if (humanReadableOutput != null && reader.NodeType == XmlNodeType.Element && reader.Name == "test-suite")
@@ -44,6 +54,9 @@ public class NUnitV3ResultParser : IXmlResultParser
                 }
             }
         }
+
+        // Security: do not trust summary attributes alone; if test-case nodes report failures, fail closed.
+        var failedTestRun = failed != 0 || observedFailed != 0;
 
         var resultLine = $"Tests run: {testcasecount} Passed: {passed} Inconclusive: {inconclusive} Failed: {failed} Ignored: {skipped + inconclusive}";
         humanReadableOutput?.WriteLine(resultLine);

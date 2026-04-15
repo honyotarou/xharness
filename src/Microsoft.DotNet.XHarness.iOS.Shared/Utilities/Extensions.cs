@@ -1,10 +1,11 @@
-﻿// Licensed to the .NET Foundation under one or more agreements.
+// Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 // See the LICENSE file in the project root for more information.
 
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Security.Cryptography;
 using System.Text;
 using System.Threading.Tasks;
 using System.Xml;
@@ -107,8 +108,19 @@ public static class Extensions
 
     public static IEnumerable<T> Shuffle<T>(this IEnumerable<T> collection)
     {
-        var rnd = new Random((int)DateTime.Now.Ticks);
-        return collection.OrderBy(v => rnd.Next());
+        if (collection == null)
+        {
+            throw new ArgumentNullException(nameof(collection));
+        }
+
+        var list = collection.ToList();
+        for (int i = list.Count - 1; i > 0; i--)
+        {
+            int j = RandomNumberGenerator.GetInt32(i + 1);
+            (list[i], list[j]) = (list[j], list[i]);
+        }
+
+        return list;
     }
 
     public static string AsHtml(this string inString)

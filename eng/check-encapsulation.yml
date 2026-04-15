@@ -1,0 +1,10 @@
+# ProjectReference レイヤーゲート（scripts/check-encapsulation.mjs）。dotnet build より前に実行する。
+steps:
+  - task: NodeTool@0
+    displayName: Use Node.js (encapsulation check)
+    inputs:
+      versionSpec: '20.x'
+
+  - script: node scripts/check-encapsulation.mjs
+    displayName: Check project reference encapsulation
+    workingDirectory: $(Build.SourcesDirectory)

@@ -1,4 +1,4 @@
-﻿// Licensed to the .NET Foundation under one or more agreements.
+// Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 // See the LICENSE file in the project root for more information.
 
@@ -7,11 +7,16 @@ using System.IO;
 using System.Net;
 using System.Net.Sockets;
 using Microsoft.DotNet.XHarness.Common.Logging;
+using Microsoft.DotNet.XHarness.Common.Networking;
+using Microsoft.DotNet.XHarness.Common.Utilities;
 
 namespace Microsoft.DotNet.XHarness.iOS.Shared.Listeners;
 
 public class SimpleHttpListener : SimpleListener
 {
+    public const int MaxRequestBodyBytes = TcpStreamLimits.MaxTestLogStreamBytes;
+    public static readonly TimeSpan ReadTimeout = TimeSpan.FromMinutes(2);
+
     private readonly bool _autoExit;
     private HttpListener _server;
     private bool _connected_once;
@@ -32,25 +37,17 @@ public class SimpleHttpListener : SimpleListener
             throw new NotImplementedException();
         }
 
-        // Try and find an unused port
-        int attemptsLeft = 50;
-        var r = new Random((int)DateTime.Now.Ticks);
-        while (attemptsLeft-- > 0)
-        {
-            var newPort = r.Next(49152, 65535); // The suggested range for dynamic ports is 49152-65535 (IANA)
-            _server.Prefixes.Clear();
-            _server.Prefixes.Add("http://*:" + newPort + "/");
-            try
-            {
-                _server.Start();
-                Port = newPort;
-                break;
-            }
-            catch (Exception ex)
-            {
-                Log.WriteLine("Failed to listen on port {0}: {1}", newPort, ex.Message);
-            }
-        }
+        // Bind to an OS-assigned ephemeral port to avoid predictable selection / port hijacking races.
+        string prefixHost = TcpListenerAddressResolver.GetHttpListenerPrefixHost();
+        using var tcp = new TcpListener(IPAddress.Loopback, 0);
+        tcp.Start();
+        var newPort = ((IPEndPoint)tcp.LocalEndpoint).Port;
+        tcp.Stop();
+
+        _server.Prefixes.Clear();
+        _server.Prefixes.Add("http://" + prefixHost + ":" + newPort + "/");
+        _server.Start();
+        Port = newPort;
 
         return Port;
     }
@@ -97,14 +94,16 @@ public class SimpleHttpListener : SimpleListener
         var request = context.Request;
         var response = "OK";
 
-        var stream = request.InputStream;
-        var data = string.Empty;
-        using (var reader = new StreamReader(stream))
+        string data = string.Empty;
+        if (request.HasEntityBody)
         {
-            data = reader.ReadToEnd();
+            // Bound in-memory read (attacker: hostile device sends a huge body).
+            if (request.InputStream.CanTimeout)
+            {
+                request.InputStream.ReadTimeout = (int)ReadTimeout.TotalMilliseconds;
+            }
+            data = StreamReadLimits.ReadToEndWithByteLimit(request.InputStream, MaxRequestBodyBytes);
         }
-
-        stream.Close();
 
         switch (request.RawUrl)
         {
@@ -138,5 +137,6 @@ public class SimpleHttpListener : SimpleListener
 
         return finished;
     }
+
 }
 

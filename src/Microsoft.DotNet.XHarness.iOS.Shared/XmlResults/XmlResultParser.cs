@@ -9,6 +9,8 @@ using System.Linq;
 using System.Xml;
 using System.Xml.Linq;
 using Microsoft.DotNet.XHarness.Common;
+using Microsoft.DotNet.XHarness.Common.Utilities;
+using Microsoft.DotNet.XHarness.Common.Xml;
 using Microsoft.DotNet.XHarness.iOS.Shared.Logging;
 using Microsoft.DotNet.XHarness.iOS.Shared.Utilities;
 
@@ -32,6 +34,7 @@ public class XmlResultParser : IResultParser
     public bool IsValidXml(string path, out XmlResultJargon type)
     {
         type = XmlResultJargon.Missing;
+        HostPathSecurity.ThrowIfUnsafeHostPath(path, nameof(path));
         if (!File.Exists(path))
         {
             return false;
@@ -97,6 +100,7 @@ public class XmlResultParser : IResultParser
 
     public string GetXmlFilePath(string path, XmlResultJargon xmlType)
     {
+        HostPathSecurity.ThrowIfUnsafeHostPath(path, nameof(path));
         var fileName = Path.GetFileName(path);
         switch (xmlType)
         {
@@ -114,6 +118,8 @@ public class XmlResultParser : IResultParser
 
     public void CleanXml(string source, string destination)
     {
+        HostPathSecurity.ThrowIfUnsafeHostPath(source, nameof(source));
+        HostPathSecurity.ThrowIfUnsafeHostPath(destination, nameof(destination));
         using (var reader = new StreamReader(source))
         using (var writer = new StreamWriter(destination))
         {
@@ -142,6 +148,11 @@ public class XmlResultParser : IResultParser
 
     public (string resultLine, bool failed) ParseResults(string source, XmlResultJargon xmlType, string? humanReadableReportDestination = null)
     {
+        HostPathSecurity.ThrowIfUnsafeHostPath(source, nameof(source));
+        if (humanReadableReportDestination != null)
+        {
+            HostPathSecurity.ThrowIfUnsafeHostPath(humanReadableReportDestination, nameof(humanReadableReportDestination));
+        }
         StreamWriter? writer = null;
         if (humanReadableReportDestination != null)
         {
@@ -155,6 +166,7 @@ public class XmlResultParser : IResultParser
 
     public (string resultLine, bool failed) ParseResults(string source, XmlResultJargon xmlType, StreamWriter? humanReadableReportDestination = null)
     {
+        HostPathSecurity.ThrowIfUnsafeHostPath(source, nameof(source));
         var reader = new StreamReader(source);
         var parsedData = ("", true);
 
@@ -168,30 +180,39 @@ public class XmlResultParser : IResultParser
 
     public void GenerateTestReport(TextWriter writer, string resultsPath, XmlResultJargon xmlType)
     {
+        HostPathSecurity.ThrowIfUnsafeHostPath(resultsPath, nameof(resultsPath));
         using var stream = new StreamReader(resultsPath);
         GenerateTestReport(writer, stream, xmlType);
     }
 
     public void GenerateTestReport(TextWriter writer, TextReader stream, XmlResultJargon xmlType)
     {
-        var reader = XmlReader.Create(stream);
-
-        if (_xmlFormatters.TryGetValue(xmlType, out var xmlFormatter))
+        using (var reader = XmlReader.Create(stream, SecureXmlReaderSettings.Create()))
         {
-            xmlFormatter.Generator.GenerateTestReport(writer, reader);
-        }
-        else
-        {
-            writer.WriteLine($"<span style='padding-left: 15px;'>Could not parse {xmlType}: Not supported format.</span><br />");
+            if (_xmlFormatters.TryGetValue(xmlType, out var xmlFormatter))
+            {
+                xmlFormatter.Generator.GenerateTestReport(writer, reader);
+            }
+            else
+            {
+                writer.WriteLine($"<span style='padding-left: 15px;'>Could not parse {xmlType}: Not supported format.</span><br />");
+            }
         }
     }
 
     // get the file, parse it and add the attachments to the first node found
     public void UpdateMissingData(string source, string destination, string applicationName, IEnumerable<string> attachments)
     {
+        HostPathSecurity.ThrowIfUnsafeHostPath(source, nameof(source));
+        HostPathSecurity.ThrowIfUnsafeHostPath(destination, nameof(destination));
         // we could do this with a XmlReader and a Writer, but might be to complicated to get right, we pay with performance what we
         // cannot pay with brain cells.
-        var doc = XDocument.Load(source);
+        XDocument doc;
+        using (var fs = File.OpenRead(source))
+        using (var reader = XmlReader.Create(fs, SecureXmlReaderSettings.Create()))
+        {
+            doc = XDocument.Load(reader);
+        }
         var attachmentsElement = new XElement("attachments");
         foreach (var path in attachments)
         {
@@ -245,6 +266,7 @@ public class XmlResultParser : IResultParser
 
     public void GenerateFailure(ILogs logs, string source, string appName, string? variation, string title, string message, string stderrPath, XmlResultJargon jargon)
     {
+        HostPathSecurity.ThrowIfUnsafeHostPath(stderrPath, nameof(stderrPath));
         using var stderrReader = new StreamReader(stderrPath);
         GenerateFailure(logs, source, appName, variation, title, message, stderrReader, jargon);
     }
@@ -276,6 +298,7 @@ public class XmlResultParser : IResultParser
             throw new ArgumentNullException(nameof(filename));
         }
 
+        HostPathSecurity.ThrowIfUnsafeHostPath(filename, nameof(filename));
         var dirName = Path.GetDirectoryName(filename);
         return dirName == null ? $"vsts-{Path.GetFileName(filename)}" : Path.Combine(dirName, $"vsts-{Path.GetFileName(filename)}");
     }

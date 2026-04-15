@@ -13,7 +13,8 @@ function SetupCredProvider {
   echo "Setting up Cred Provider NuGet plugin in the agent..."...
   echo "Getting 'installcredprovider.ps1' from 'https://github.com/microsoft/artifacts-credprovider'..."
 
-  local url="https://raw.githubusercontent.com/microsoft/artifacts-credprovider/master/helpers/installcredprovider.sh"  
+  # Pinned to a specific commit to avoid executing mutable remote content.
+  local url="https://raw.githubusercontent.com/microsoft/artifacts-credprovider/0f53327cd12fd893d8627d7b08a2171bf5852a41/helpers/installcredprovider.sh"
   
   echo "Writing the contents of 'installcredprovider.ps1' locally..."
   local installcredproviderPath="installcredprovider.sh"

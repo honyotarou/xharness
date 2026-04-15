@@ -1,4 +1,4 @@
-﻿// Licensed to the .NET Foundation under one or more agreements.
+// Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 // See the LICENSE file in the project root for more information.
 
@@ -6,6 +6,7 @@ using System;
 using System.IO;
 using System.Threading;
 using Microsoft.DotNet.XHarness.Common.Logging;
+using Microsoft.DotNet.XHarness.Common.Utilities;
 
 namespace Microsoft.DotNet.XHarness.iOS.Shared.Logging;
 
@@ -58,7 +59,9 @@ public class CaptureLog : FileBackedLog, ICaptureLog
     public CaptureLog(string destinationPath, string capturedPath, bool entireFile = false)
     {
         FullPath = destinationPath ?? throw new ArgumentNullException(nameof(destinationPath));
-        CapturePath = capturedPath ?? throw new ArgumentNullException(nameof(destinationPath));
+        CapturePath = capturedPath ?? throw new ArgumentNullException(nameof(capturedPath));
+        HostPathSecurity.ThrowIfUnsafeHostPath(destinationPath, nameof(destinationPath));
+        HostPathSecurity.ThrowIfUnsafeHostPath(capturedPath, nameof(capturedPath));
         _entireFile = entireFile;
     }
 

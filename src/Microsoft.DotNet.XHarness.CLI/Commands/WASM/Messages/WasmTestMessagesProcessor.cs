@@ -12,13 +12,24 @@ using System.Threading.Channels;
 using System.Threading.Tasks;
 using Microsoft.DotNet.XHarness.Common;
 using Microsoft.DotNet.XHarness.Common.CLI;
+using Microsoft.DotNet.XHarness.Common.Utilities;
 using Microsoft.Extensions.Logging;
 
 namespace Microsoft.DotNet.XHarness.CLI.Commands.Wasm;
 
 public class WasmTestMessagesProcessor
 {
-    private static Regex xmlRx = new Regex(@"^STARTRESULTXML ([0-9]*) ([^ ]*) ENDRESULTXML", RegexOptions.Compiled | RegexOptions.CultureInvariant);
+    /// <summary>Matches embedded XML result lines from the wasm test host (used by tests and <see cref="ProcessMessage"/>).</summary>
+    internal static readonly Regex XmlResultLineRegex = RegexSecurity.Create(
+        @"^STARTRESULTXML ([0-9]*) ([^ ]*) ENDRESULTXML",
+        RegexOptions.CultureInvariant);
+
+    private const int MaxWasmJsonLogEnvelopeChars = 262_144;
+
+    private static readonly JsonSerializerOptions s_wasmLogJsonOptions = new()
+    {
+        MaxDepth = 64,
+    };
     private readonly StreamWriter _stdoutFileWriter;
     private readonly string _xmlResultsFilePath;
     private static TimeSpan s_logMessagesTimeout = TimeSpan.FromMinutes(2);
@@ -31,6 +42,7 @@ public class WasmTestMessagesProcessor
     private readonly TaskCompletionSource _completed = new ();
     private bool _isRunning => !_completed.Task.IsCompleted;
     private bool _loggedProcessorStopped = false;
+    private bool _xmlResultsWritten = false;
 
     public string? LineThatMatchedErrorPattern { get; private set; }
 
@@ -40,6 +52,8 @@ public class WasmTestMessagesProcessor
 
     public WasmTestMessagesProcessor(string xmlResultsFilePath, string stdoutFilePath, ILogger logger, string? errorPatternsFile = null, WasmSymbolicatorBase? symbolicator = null)
     {
+        HostPathSecurity.ThrowIfUnsafeHostPath(xmlResultsFilePath, nameof(xmlResultsFilePath));
+        HostPathSecurity.ThrowIfUnsafeHostPath(stdoutFilePath, nameof(stdoutFilePath));
         _xmlResultsFilePath = xmlResultsFilePath;
         _stdoutFileWriter = File.CreateText(stdoutFilePath);
         _stdoutFileWriter.AutoFlush = true;
@@ -47,6 +61,7 @@ public class WasmTestMessagesProcessor
 
         if (errorPatternsFile != null)
         {
+            HostPathSecurity.ThrowIfUnsafeHostPath(errorPatternsFile, nameof(errorPatternsFile));
             if (!File.Exists(errorPatternsFile))
                 throw new ArgumentException($"Cannot find error patterns file {errorPatternsFile}");
 
@@ -158,25 +173,33 @@ public class WasmTestMessagesProcessor
 
         if (message.StartsWith("{"))
         {
-            try
+            if (message.Length > MaxWasmJsonLogEnvelopeChars)
             {
-                logMessage = JsonSerializer.Deserialize<WasmLogMessage>(message);
-                if (logMessage != null)
+                _logger.LogWarning("Structured JSON log message exceeds maximum length ({Max} chars); logging raw text without parsing.", MaxWasmJsonLogEnvelopeChars);
+                line = message;
+            }
+            else
+            {
+                try
                 {
-                    // Use payload (the formatted text) if available, otherwise join arguments.
-                    // Do not concatenate both — payload already contains the formatted output,
-                    // and arguments duplicates it for simple console.log() calls.
-                    line = logMessage.payload ?? string.Join(" ", logMessage.arguments ?? Enumerable.Empty<object>());
+                    logMessage = JsonSerializer.Deserialize<WasmLogMessage>(message, s_wasmLogJsonOptions);
+                    if (logMessage != null)
+                    {
+                        // Use payload (the formatted text) if available, otherwise join arguments.
+                        // Do not concatenate both — payload already contains the formatted output,
+                        // and arguments duplicates it for simple console.log() calls.
+                        line = logMessage.payload ?? string.Join(" ", logMessage.arguments ?? Enumerable.Empty<object>());
+                    }
+                    else
+                    {
+                        line = message;
+                    }
                 }
-                else
+                catch (JsonException e)
                 {
+                    _logger.LogError(e.Message);
                     line = message;
                 }
-            }
-            catch (JsonException e)
-            {
-                _logger.LogError(e.Message);
-                line = message;
             }
         }
         else
@@ -185,23 +208,37 @@ public class WasmTestMessagesProcessor
         }
 
         line = line.TrimEnd();
+        line = LogInjectionSecurity.Sanitize(line);
 
-        var match = xmlRx.Match(line);
+        var match = XmlResultLineRegex.Match(line);
         if (match.Success)
         {
-            var expectedLength = Int32.Parse(match.Groups[1].Value);
-            using (var stream = new FileStream(_xmlResultsFilePath, FileMode.Create))
+            if (_xmlResultsWritten)
             {
-                var bytes = System.Convert.FromBase64String(match.Groups[2].Value);
-                stream.Write(bytes);
-                if (bytes.Length == expectedLength)
+                // Security: do not allow later STARTRESULTXML lines to overwrite earlier results.
+                _logger.LogWarning("Ignoring duplicate embedded XML result line (results were already written).");
+                return;
+            }
+
+            if (!WasmXmlResultPayloadDecoder.TryDecodeXmlResultLine(match, WasmXmlResultPayloadDecoder.MaxDecodedXmlResultBytes, out var bytes, out var expectedLength) || bytes == null)
+            {
+                _logger.LogWarning("Rejected embedded XML result line: invalid length or base64, or payload exceeds maximum decoded size.");
+            }
+            else
+            {
+                using (var stream = new FileStream(_xmlResultsFilePath, FileMode.Create))
                 {
-                    _logger.LogInformation($"Received expected {bytes.Length} of {_xmlResultsFilePath}");
+                    stream.Write(bytes);
+                    if (bytes.Length == expectedLength)
+                    {
+                        _logger.LogInformation($"Received expected {bytes.Length} of {_xmlResultsFilePath}");
+                    }
+                    else
+                    {
+                        _logger.LogInformation($"Received {bytes.Length} of {_xmlResultsFilePath} but expected {expectedLength}");
+                    }
                 }
-                else
-                {
-                    _logger.LogInformation($"Received {bytes.Length} of {_xmlResultsFilePath} but expected {expectedLength}");
-                }
+                _xmlResultsWritten = true;
             }
         }
         else
@@ -263,4 +300,39 @@ public class WasmTestMessagesProcessor
     }
 
     public void ProcessErrorMessage(string message) => Invoke(message, isError: true);
+}
+
+/// <summary>
+/// Cycle 5 — attacker: oversized or malformed base64 in STARTRESULTXML lines (memory DoS, parse errors).
+/// </summary>
+internal static class WasmXmlResultPayloadDecoder
+{
+    internal const int MaxDecodedXmlResultBytes = 64 * 1024 * 1024;
+
+    internal static bool TryDecodeXmlResultLine(Match match, int maxDecodedBytes, out byte[]? bytes, out int expectedLength)
+    {
+        bytes = null;
+        expectedLength = 0;
+        if (!int.TryParse(match.Groups[1].Value, out expectedLength) || expectedLength < 0)
+        {
+            return false;
+        }
+
+        try
+        {
+            bytes = Convert.FromBase64String(match.Groups[2].Value);
+        }
+        catch (FormatException)
+        {
+            return false;
+        }
+
+        if (bytes.Length > maxDecodedBytes)
+        {
+            bytes = null;
+            return false;
+        }
+
+        return true;
+    }
 }

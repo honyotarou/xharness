@@ -1,4 +1,4 @@
-﻿// Licensed to the .NET Foundation under one or more agreements.
+// Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 // See the LICENSE file in the project root for more information.
 
@@ -11,6 +11,7 @@ using System.Net.Sockets;
 using System.Runtime.InteropServices;
 using System.Security.Cryptography;
 using System.Text;
+using System.Threading;
 
 namespace Microsoft.DotNet.XHarness.iOS.Shared.Utilities;
 
@@ -34,13 +35,12 @@ public class Helpers : IHelpers
     // annoying when XS reloads the projects, and also causes unnecessary rebuilds).
     // Nothing really breaks when the sequence isn't identical from run to run, so
     // this is just a best minimal effort.
-    private static readonly Random s_guidGenerator = new(unchecked((int)0xdeadf00d));
     public Guid GenerateStableGuid(string seed = null)
     {
         var bytes = new byte[16];
         if (seed == null)
         {
-            s_guidGenerator.NextBytes(bytes);
+            RandomNumberGenerator.Fill(bytes);
         }
         else
         {

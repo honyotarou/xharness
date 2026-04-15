@@ -1,4 +1,4 @@
-﻿// Licensed to the .NET Foundation under one or more agreements.
+// Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 // See the LICENSE file in the project root for more information.
 
@@ -10,6 +10,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.DotNet.XHarness.Common.Logging;
+using Microsoft.DotNet.XHarness.Common.Utilities;
 using Microsoft.DotNet.XHarness.iOS.Shared.Execution;
 using Microsoft.DotNet.XHarness.iOS.Shared.Logging;
 
@@ -226,6 +227,11 @@ public class CrashSnapshotReporter : ICrashSnapshotReporter
                 var result = await _processManager.ExecuteCommandAsync(args, _log, TimeSpan.FromMinutes(1));
                 if (result.Succeeded)
                 {
+                    HostPathSecurity.ThrowIfUnsafeHostPath(tempFile, nameof(tempFile));
+                    FilePayloadSecurity.ThrowIfFileExceedsMaxBytes(
+                        tempFile,
+                        nameof(tempFile),
+                        FilePayloadSecurity.DefaultMaxCrashListFileBytes);
                     crashes.UnionWith(File.ReadAllLines(tempFile));
                 }
             }

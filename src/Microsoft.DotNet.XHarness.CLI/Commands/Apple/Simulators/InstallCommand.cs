@@ -1,4 +1,4 @@
-﻿// Licensed to the .NET Foundation under one or more agreements.
+// Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 // See the LICENSE file in the project root for more information.
 
@@ -12,6 +12,8 @@ using System.Threading.Tasks;
 using System.Xml;
 using Microsoft.DotNet.XHarness.CLI.CommandArguments.Apple.Simulators;
 using Microsoft.DotNet.XHarness.Common.CLI;
+using Microsoft.DotNet.XHarness.Common.Utilities;
+using Microsoft.DotNet.XHarness.Common.Xml;
 using Microsoft.Extensions.Logging;
 
 namespace Microsoft.DotNet.XHarness.CLI.Commands.Apple.Simulators;
@@ -159,6 +161,7 @@ internal class InstallCommand : SimulatorsCommand
         {
             var filename = Path.GetFileName(simulator.Source);
             var downloadPath = Path.Combine(TempDirectory, filename);
+            HostPathSecurity.ThrowIfUnsafeHostPath(downloadPath, nameof(downloadPath));
             var download = true;
 
             if (!File.Exists(downloadPath))
@@ -245,7 +248,12 @@ internal class InstallCommand : SimulatorsCommand
             }
         }
 
-        using (var response = await httpClient.GetAsync(simulator.Source, HttpCompletionOption.ResponseHeadersRead))
+        if (!Uri.TryCreate(simulator.Source, UriKind.Absolute, out var downloadUri) || !string.Equals(downloadUri.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException($"Simulator download URL must be absolute HTTPS: {simulator.Source}");
+        }
+
+        using (var response = await httpClient.GetAsync(downloadUri, HttpCompletionOption.ResponseHeadersRead))
         {
             response.EnsureSuccessStatusCode();
 
@@ -298,6 +306,11 @@ internal class InstallCommand : SimulatorsCommand
         watch.Stop();
 
         var size = new FileInfo(downloadPath).Length;
+        if (size != simulator.FileSize)
+        {
+            File.Delete(downloadPath);
+            throw new InvalidOperationException($"Downloaded simulator size ({size} bytes) does not match expected size ({simulator.FileSize} bytes).");
+        }
         Logger.LogInformation($"Downloaded {size / 1024.0 / 1024.0:N1} MB in {watch.Elapsed:hh\\:mm\\:ss}");
     }
 
@@ -319,6 +332,7 @@ internal class InstallCommand : SimulatorsCommand
         else
         {
             var mount_point = Path.Combine(TempDirectory, filename + "-mount");
+            HostPathSecurity.ThrowIfUnsafeHostPath(mount_point, nameof(mount_point));
             Directory.CreateDirectory(mount_point);
             try
             {
@@ -348,6 +362,7 @@ internal class InstallCommand : SimulatorsCommand
                     // That's obviously not where it's installed, but I have no idea how Apple does it
                     // So instead decompress the package, modify the package manifest, re-create the package, and then install it.
                     var expanded_path = Path.Combine(TempDirectory + "-expanded-pkg");
+                    HostPathSecurity.ThrowIfUnsafeHostPath(expanded_path, nameof(expanded_path));
                     if (Directory.Exists(expanded_path))
                     {
                         Directory.Delete(expanded_path, true);
@@ -364,8 +379,13 @@ internal class InstallCommand : SimulatorsCommand
                     try
                     {
                         var packageInfoPath = Path.Combine(expanded_path, "PackageInfo");
+                        HostPathSecurity.ThrowIfUnsafeHostPath(packageInfoPath, nameof(packageInfoPath));
                         var packageInfoDoc = new XmlDocument();
-                        packageInfoDoc.Load(packageInfoPath);
+                        using (var fs = File.OpenRead(packageInfoPath))
+                        using (var reader = XmlReader.Create(fs, SecureXmlReaderSettings.Create(ignoreWhitespace: true)))
+                        {
+                            packageInfoDoc.Load(reader);
+                        }
                         // Add the install-location attribute to the pkg-info node
                         var attr = packageInfoDoc.CreateAttribute("install-location");
                         attr.Value = simulator.InstallPrefix;
@@ -373,6 +393,7 @@ internal class InstallCommand : SimulatorsCommand
                         packageInfoDoc.Save(packageInfoPath);
 
                         var fixed_path = Path.Combine(Path.GetDirectoryName(downloadPath)!, Path.GetFileNameWithoutExtension(downloadPath) + "-fixed.pkg");
+                        HostPathSecurity.ThrowIfUnsafeHostPath(fixed_path, nameof(fixed_path));
                         if (File.Exists(fixed_path))
                         {
                             File.Delete(fixed_path);

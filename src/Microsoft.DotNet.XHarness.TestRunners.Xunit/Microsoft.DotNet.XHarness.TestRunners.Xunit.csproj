@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <TargetFrameworks>$(XHarnessNetTFMs)</TargetFrameworks>
@@ -23,6 +23,10 @@
   </ItemGroup>
 
   <ItemGroup>
+    <Compile Include="..\Microsoft.DotNet.XHarness.Common\Xml\SecureXmlReaderSettings.cs"
+             Link="Xml\SecureXmlReaderSettings.cs" />
+    <Compile Include="..\Microsoft.DotNet.XHarness.Common\Utilities\WebServerStatefulSession.cs"
+             Link="Utilities\WebServerStatefulSession.cs" />
     <ProjectReference Include="..\Microsoft.DotNet.XHarness.TestRunners.Common\Microsoft.DotNet.XHarness.TestRunners.Common.csproj" />
   </ItemGroup>
 

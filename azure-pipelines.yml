@@ -65,6 +65,8 @@ extends:
             displayName: Build Windows
             timeoutInMinutes: 120
             steps:
+              - template: /eng/check-encapsulation.yml@self
+
               - script: eng\common\CIBuild.cmd -configuration $(_BuildConfig) -prepareMachine $(_InternalBuildArgs) /p:Test=false
                 name: Build
                 displayName: Build

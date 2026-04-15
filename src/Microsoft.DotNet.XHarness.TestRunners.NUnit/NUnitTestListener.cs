@@ -3,6 +3,7 @@
 // See the LICENSE file in the project root for more information.
 
 using System;
+using System.IO;
 using System.Text;
 using System.Xml;
 using Microsoft.DotNet.XHarness.TestRunners.Common;
@@ -102,7 +103,7 @@ internal class NUnitTestListener : ITestEventListener
             {
                 if (stacktraceNodes[0].ChildNodes.Count == 1) // should not happen, but I trust no one
                 {
-                    var cDataNode = messageNodes[0].ChildNodes[0];
+                    var cDataNode = stacktraceNodes[0].ChildNodes[0];
                     var stackTrace = cDataNode?.InnerText?.Trim();
                     if (!string.IsNullOrEmpty(stackTrace))
                     {
@@ -131,7 +132,20 @@ internal class NUnitTestListener : ITestEventListener
         // again, not a simple api, the report string is an xml, that contains a fragment of xml
         // which depends on the event type, load the xml, do the appropriate thing.
         var doc = new XmlDocument();
-        doc.LoadXml(report);
+        // Match Microsoft.DotNet.XHarness.Common.Xml.SecureXmlReaderSettings (NUnit runner cannot reference Common — XmlResultJargon type identity).
+        var readerSettings = new XmlReaderSettings
+        {
+            DtdProcessing = DtdProcessing.Prohibit,
+            XmlResolver = null,
+            IgnoreComments = true,
+            IgnoreProcessingInstructions = true,
+            MaxCharactersFromEntities = 100_000,
+        };
+        using (var stringReader = new StringReader(report))
+        using (var xmlReader = XmlReader.Create(stringReader, readerSettings))
+        {
+            doc.Load(xmlReader);
+        }
 
         var testEvent = doc.FirstChild;
         switch (testEvent.Name)

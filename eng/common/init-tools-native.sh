@@ -177,7 +177,17 @@ if [[ ${#native_assets[@]} -eq 0 ]]; then
 else
   native_installer_dir="$scriptroot/native"
   for index in "${!native_assets[@]}"; do
-    eval "${native_assets["$index"]}"
+    asset_line="${native_assets["$index"]}"
+    if [[ "$asset_line" =~ ^KEY=(.*)\ VALUE=(.*)$ ]]; then
+      KEY="${BASH_REMATCH[1]}"
+      VALUE="${BASH_REMATCH[2]}"
+      # tokens are single-quoted to match jq(1)'s @sh formatting
+      KEY="${KEY#\'}"; KEY="${KEY%\'}"
+      VALUE="${VALUE#\'}"; VALUE="${VALUE%\'}"
+    else
+      echo "Invalid native tool entry: $asset_line"
+      exit 1
+    fi
 
     installer_path="$native_installer_dir/install-$KEY.sh"
     installer_command="$installer_path"

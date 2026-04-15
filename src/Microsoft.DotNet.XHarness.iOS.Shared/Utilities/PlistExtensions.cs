@@ -1,4 +1,4 @@
-﻿// Licensed to the .NET Foundation under one or more agreements.
+// Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 // See the LICENSE file in the project root for more information.
 
@@ -6,6 +6,8 @@ using System;
 using System.IO;
 using System.Runtime.CompilerServices;
 using System.Xml;
+using Microsoft.DotNet.XHarness.Common.Utilities;
+using Microsoft.DotNet.XHarness.Common.Xml;
 
 namespace Microsoft.DotNet.XHarness.iOS.Shared.Utilities;
 
@@ -26,12 +28,15 @@ public static class PListExtensions
 
     public static void LoadWithoutNetworkAccess(this XmlDocument doc, string filename)
     {
+        HostPathSecurity.ThrowIfUnsafeHostPath(filename, nameof(filename));
         using (var fs = new FileStream(filename, FileMode.Open, FileAccess.Read))
         {
-            var settings = new XmlReaderSettings()
+            // Apple plists ship with an internal DTD; Prohibit breaks real files. External XXE is mitigated by XmlResolver = null + entity cap.
+            var settings = new XmlReaderSettings
             {
                 XmlResolver = null,
                 DtdProcessing = DtdProcessing.Parse,
+                MaxCharactersFromEntities = SecureXmlReaderSettings.DefaultMaxCharactersFromEntities,
             };
             using (var reader = XmlReader.Create(fs, settings))
             {
@@ -45,10 +50,12 @@ public static class PListExtensions
     {
         using (var fs = new StringReader(xml))
         {
-            var settings = new XmlReaderSettings()
+            var settings = new XmlReaderSettings
             {
                 XmlResolver = null,
-                DtdProcessing = DtdProcessing.Parse,
+                // XML strings are not expected to include plist DTD; prohibit DTD to reduce attack surface.
+                DtdProcessing = DtdProcessing.Prohibit,
+                MaxCharactersFromEntities = SecureXmlReaderSettings.DefaultMaxCharactersFromEntities,
             };
             using (var reader = XmlReader.Create(fs, settings))
             {
@@ -114,7 +121,7 @@ public static class PListExtensions
             throw new ArgumentNullException(nameof(value));
         }
 
-        var element = plist.SelectSingleNode("//dict/key[text()='" + node + "']");
+        var element = plist.SelectSingleNode("//dict/key[text()=" + XPathLiteralSecurity.QuoteForXPathStringLiteral(node) + "]");
         if (element == null)
         {
             plist.AddPListStringValue(node, value);
@@ -141,7 +148,8 @@ public static class PListExtensions
         var keyElement = plist.CreateElement("key");
         keyElement.InnerText = node;
         var valueElement = plist.CreateElement(valueType);
-        valueElement.InnerXml = value;
+        // Treat input as data, not markup (attacker: plist value injection).
+        valueElement.InnerText = value;
         var root = plist.SelectSingleNode("//dict");
         root.AppendChild(keyElement);
         root.AppendChild(valueElement);
@@ -152,7 +160,7 @@ public static class PListExtensions
 
     private static void SetPListArrayOfIntegerValues(this XmlDocument plist, string node, params int[] values)
     {
-        var key = plist.SelectSingleNode("//dict/key[text()='" + node + "']");
+        var key = plist.SelectSingleNode("//dict/key[text()=" + XPathLiteralSecurity.QuoteForXPathStringLiteral(node) + "]");
         key.ParentNode.RemoveChild(key.NextSibling);
         var array = plist.CreateElement("array");
         foreach (var value in values)
@@ -165,11 +173,11 @@ public static class PListExtensions
     }
 
     private static string GetPListStringValue(this XmlDocument plist, string node) =>
-        plist.SelectSingleNode("//dict/key[text()='" + node + "']").NextSibling.InnerText;
+        plist.SelectSingleNode("//dict/key[text()=" + XPathLiteralSecurity.QuoteForXPathStringLiteral(node) + "]").NextSibling.InnerText;
 
     private static bool TryGetPListStringValue(this XmlDocument plist, string nodeName, out string value)
     {
-        var node = plist.SelectSingleNode("//dict/key[text()='" + nodeName + "']")?.NextSibling;
+        var node = plist.SelectSingleNode("//dict/key[text()=" + XPathLiteralSecurity.QuoteForXPathStringLiteral(nodeName) + "]")?.NextSibling;
         if (node == null)
         {
             value = null;

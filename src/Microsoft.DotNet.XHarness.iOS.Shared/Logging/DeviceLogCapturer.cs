@@ -19,6 +19,7 @@ public interface IDeviceLogCapturer : IDisposable
 
 public class DeviceLogCapturer : IDeviceLogCapturer
 {
+    private const string AllowSudoLogCollectEnv = "XHARNESS_ALLOW_SUDO_LOG_COLLECT";
     private readonly ILog _mainLog;
     private readonly ILog _deviceLog;
     private readonly string _deviceUdid;
@@ -31,7 +32,13 @@ public class DeviceLogCapturer : IDeviceLogCapturer
         _deviceLog = deviceLog ?? throw new ArgumentNullException(nameof(deviceLog));
         _deviceUdid = deviceUdid ?? throw new ArgumentNullException(nameof(deviceUdid));
 
-        _outputPath = Path.Combine(Path.GetTempPath(), $"device_logs_{Guid.NewGuid()}.logarchive");
+        // User-private directory (avoids world-writable shared /tmp on some Unix installs).
+        string baseDir = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            "xharness",
+            "device_logs");
+        Directory.CreateDirectory(baseDir);
+        _outputPath = Path.Combine(baseDir, $"device_logs_{Guid.NewGuid():N}.logarchive");
     }
 
     public void StartCapture()
@@ -50,13 +57,30 @@ public class DeviceLogCapturer : IDeviceLogCapturer
         // becomes unresponsive (e.g. tvOS devices with broken log streaming).
         const int processTimeoutMs = 120_000; // 2 minutes
 
-        string collectArguments = $"log collect --device-udid {_deviceUdid} --start \"{startTimeStr}\" --output \"{_outputPath}\"";
-        _deviceLog.WriteLine($"Collecting logs: sudo {collectArguments}");
+        bool allowSudo =
+            string.Equals(Environment.GetEnvironmentVariable(AllowSudoLogCollectEnv)?.Trim(), "1", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(Environment.GetEnvironmentVariable(AllowSudoLogCollectEnv)?.Trim(), "true", StringComparison.OrdinalIgnoreCase);
+
+        if (!allowSudo)
+        {
+            _mainLog.WriteLine($"Skipping device log collection because it requires sudo. Set {AllowSudoLogCollectEnv}=1 to enable.");
+            CleanupOutputPath();
+            return;
+        }
+
+        _deviceLog.WriteLine($"Collecting logs: sudo log collect --device-udid <udid> --start \"{startTimeStr}\" --output \"{_outputPath}\"");
 
         using Process collectProcess = new Process();
         collectProcess.StartInfo.FileName = "sudo";
-        collectProcess.StartInfo.Arguments = collectArguments;
         collectProcess.StartInfo.UseShellExecute = false;
+        collectProcess.StartInfo.ArgumentList.Add("log");
+        collectProcess.StartInfo.ArgumentList.Add("collect");
+        collectProcess.StartInfo.ArgumentList.Add("--device-udid");
+        collectProcess.StartInfo.ArgumentList.Add(_deviceUdid);
+        collectProcess.StartInfo.ArgumentList.Add("--start");
+        collectProcess.StartInfo.ArgumentList.Add(startTimeStr);
+        collectProcess.StartInfo.ArgumentList.Add("--output");
+        collectProcess.StartInfo.ArgumentList.Add(_outputPath);
         collectProcess.StartInfo.RedirectStandardOutput = true;
         collectProcess.StartInfo.RedirectStandardError = true;
 
@@ -103,13 +127,13 @@ public class DeviceLogCapturer : IDeviceLogCapturer
         }
 
         // Read the collected logs
-        string readArguments = $"show \"{_outputPath}\"";
-        _deviceLog.WriteLine($"Reading logs: log {readArguments}");
+        _deviceLog.WriteLine($"Reading logs: log show \"{_outputPath}\"");
 
         using Process readProcess = new Process();
         readProcess.StartInfo.FileName = "log";
-        readProcess.StartInfo.Arguments = readArguments;
         readProcess.StartInfo.UseShellExecute = false;
+        readProcess.StartInfo.ArgumentList.Add("show");
+        readProcess.StartInfo.ArgumentList.Add(_outputPath);
         readProcess.StartInfo.RedirectStandardOutput = true;
         readProcess.StartInfo.RedirectStandardError = true;
 

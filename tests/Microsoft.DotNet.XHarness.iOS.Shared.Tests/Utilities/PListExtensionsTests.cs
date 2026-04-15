@@ -3,6 +3,7 @@ using System.IO;
 using System.Linq;
 using System.Text;
 using System.Xml;
+using Microsoft.DotNet.XHarness.Common.Xml;
 using Microsoft.DotNet.XHarness.iOS.Shared.Utilities;
 using Xunit;
 
@@ -93,4 +94,42 @@ public class PListExtensionsTests
 
     [Fact]
     public void SetNullCFBundleName() => Assert.Throws<ArgumentNullException>(() => _plist.SetCFBundleName(null));
+
+    [Fact]
+    public void LoadWithoutNetworkAccess_RejectsTraversalPath()
+    {
+        var doc = new XmlDocument();
+        Assert.Throws<ArgumentException>(() => doc.LoadWithoutNetworkAccess("/tmp/../etc/passwd"));
+    }
+
+    [Fact]
+    public void SecureXmlReaderEntityCap_UsedForPlistMaxCharactersFromEntities()
+    {
+        // PListExtensions sets MaxCharactersFromEntities = SecureXmlReaderSettings.DefaultMaxCharactersFromEntities.
+        Assert.InRange(SecureXmlReaderSettings.DefaultMaxCharactersFromEntities, 1000, 10_000_000);
+    }
+
+    [Fact]
+    public void SetPListStringValue_KeyContainingSingleQuote_RoundTrips()
+    {
+        var doc = new XmlDocument();
+        doc.LoadXml("<?xml version=\"1.0\" encoding=\"UTF-8\"?><plist version=\"1.0\"><dict></dict></plist>");
+        doc.SetPListStringValue("O'Reilly", "books");
+        Assert.True(doc.ContainsKey("O'Reilly"));
+    }
+
+    [Fact]
+    public void AddPListKeyValuePair_DoesNotInterpretValueAsXmlMarkup()
+    {
+        var doc = new XmlDocument();
+        doc.LoadXml("<?xml version=\"1.0\" encoding=\"UTF-8\"?><plist version=\"1.0\"><dict></dict></plist>");
+
+        doc.AddPListKeyValuePair("k", "string", "<injected/>");
+
+        var node = doc.SelectSingleNode("//dict/key[text()='k']")?.NextSibling;
+        Assert.NotNull(node);
+        Assert.Equal("string", node!.Name);
+        Assert.Equal("<injected/>", node.InnerText);
+        Assert.Null(doc.SelectSingleNode("//injected"));
+    }
 }

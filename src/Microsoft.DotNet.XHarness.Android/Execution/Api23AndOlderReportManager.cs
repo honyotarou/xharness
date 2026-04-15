@@ -1,10 +1,11 @@
-﻿// Licensed to the .NET Foundation under one or more agreements.
+// Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 // See the LICENSE file in the project root for more information.
 
 using System;
 using System.IO;
 using System.Threading;
+using Microsoft.DotNet.XHarness.Common.Utilities;
 using Microsoft.Extensions.Logging;
 
 namespace Microsoft.DotNet.XHarness.Android.Execution;
@@ -20,6 +21,7 @@ internal class Api23AndOlderReportManager : IReportManager
 
     public string DumpBugReport(AdbRunner runner, string outputFilePathWithoutFormat)
     {
+        HostPathSecurity.ThrowIfUnsafeHostPath(outputFilePathWithoutFormat, nameof(outputFilePathWithoutFormat));
         // give some time for bug report to be available
         Thread.Sleep(3000);
 

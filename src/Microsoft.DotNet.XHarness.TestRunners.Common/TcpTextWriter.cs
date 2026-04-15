@@ -1,4 +1,4 @@
-﻿// Licensed to the .NET Foundation under one or more agreements.
+// Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 // See the LICENSE file in the project root for more information.
 
@@ -9,6 +9,7 @@ using System.Net;
 using System.Net.Sockets;
 using System.Text;
 using System.Threading;
+using Microsoft.DotNet.XHarness.Common.Networking;
 
 #nullable enable
 namespace Microsoft.DotNet.XHarness.TestRunners.Common;
@@ -33,7 +34,7 @@ internal class TcpTextWriter : TextWriter
     {
         ValidatePort(port);
 
-        var server = new TcpListener(IPAddress.Any, port);
+        var server = new TcpListener(TcpListenerAddressResolver.GetListenAddress(), port);
         server.Server.ReceiveTimeout = 5000;
         server.Start();
         var watch = Stopwatch.StartNew();
@@ -53,10 +54,19 @@ internal class TcpTextWriter : TextWriter
         // Block until we have the ping from the client side
         byte[] buffer = new byte[16 * 1024];
         var stream = client.GetStream();
-        while ((_ = stream.Read(buffer, 0, buffer.Length)) != 0)
+        int n;
+        int totalRead = 0;
+        while ((n = stream.Read(buffer, 0, buffer.Length)) != 0)
         {
-            var message = Encoding.UTF8.GetString(buffer);
-            if (message.Contains("ping"))
+            totalRead += n;
+            if (totalRead > TcpStreamLimits.MaxPingHandshakeScanBytes)
+            {
+                throw new InvalidOperationException(
+                    $"TCP handshake exceeded maximum scan size ({TcpStreamLimits.MaxPingHandshakeScanBytes} bytes).");
+            }
+
+            var message = Encoding.UTF8.GetString(buffer, 0, n);
+            if (message.Contains("ping", StringComparison.Ordinal))
             {
                 break;
             }

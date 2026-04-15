@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <TargetFrameworks>$(XHarnessNetTFMs)</TargetFrameworks>
@@ -13,6 +13,14 @@
   </ItemGroup>
 
   <ItemGroup>
+    <Compile Include="..\Microsoft.DotNet.XHarness.Common\Networking\TcpListenerAddressResolver.cs"
+             Link="TcpListenerAddressResolver.cs" />
+    <Compile Include="..\Microsoft.DotNet.XHarness.Common\Networking\TcpStreamLimits.cs"
+             Link="TcpStreamLimits.cs" />
+    <Compile Include="..\Microsoft.DotNet.XHarness.Common\CLI\CliTokenValidator.cs"
+             Link="CliTokenValidator.cs" />
+    <Compile Include="..\Microsoft.DotNet.XHarness.Common\Utilities\HostPathSecurity.cs"
+             Link="HostPathSecurity.cs" />
     <Compile Include="..\Microsoft.DotNet.XHarness.Common\XmlResultJargon.cs"
              Link="XmlResultJargon.cs" />
     <Compile Include="..\Microsoft.DotNet.XHarness.iOS.Shared\Execution\EnviromentVariables.cs"

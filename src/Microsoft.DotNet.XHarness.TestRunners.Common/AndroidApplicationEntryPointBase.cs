@@ -1,9 +1,10 @@
-﻿// Licensed to the .NET Foundation under one or more agreements.
+// Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 // See the LICENSE file in the project root for more information.
 
 using System.IO;
 using System.Threading.Tasks;
+using Microsoft.DotNet.XHarness.Common.Utilities;
 
 #nullable enable
 namespace Microsoft.DotNet.XHarness.TestRunners.Common;
@@ -25,6 +26,7 @@ public abstract class AndroidApplicationEntryPointBase : ApplicationEntryPoint
 
     public override async Task RunAsync()
     {
+        HostPathSecurity.ThrowIfUnsafeHostPath(TestsResultsFinalPath, nameof(TestsResultsFinalPath));
         var options = ApplicationOptions.Current;
         using TextWriter? resultsFileMaybe = options.EnableXml ? File.CreateText(TestsResultsFinalPath) : null;
         await InternalRunAsync(options, Logger, resultsFileMaybe);

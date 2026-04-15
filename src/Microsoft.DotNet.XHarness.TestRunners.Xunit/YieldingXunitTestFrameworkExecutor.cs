@@ -66,7 +66,16 @@ internal class YieldingXunitTestFrameworkExecutor : XunitTestFrameworkExecutor
 
     protected override async void RunTestCases(IEnumerable<IXunitTestCase> testCases, IMessageSink executionMessageSink, ITestFrameworkExecutionOptions executionOptions)
     {
-        await RunTestCasesAsync(testCases, executionMessageSink, executionOptions);
+        try
+        {
+            await RunTestCasesAsync(testCases, executionMessageSink, executionOptions);
+        }
+        catch (Exception ex)
+        {
+            // Surface unexpected exceptions instead of losing them in async-void.
+            DiagnosticMessageSink?.OnMessage(new Xunit.Sdk.DiagnosticMessage($"Unhandled exception in test executor: {ex}"));
+            throw;
+        }
     }
 }
 

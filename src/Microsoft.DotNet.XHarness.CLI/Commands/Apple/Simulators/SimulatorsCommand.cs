@@ -1,4 +1,4 @@
-﻿// Licensed to the .NET Foundation under one or more agreements.
+// Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 // See the LICENSE file in the project root for more information.
 
@@ -15,7 +15,9 @@ using System.Threading.Tasks;
 using System.Xml;
 using Microsoft.DotNet.XHarness.CLI.CommandArguments.Apple.Simulators;
 using Microsoft.DotNet.XHarness.Common;
+using Microsoft.DotNet.XHarness.Common.Xml;
 using Microsoft.DotNet.XHarness.Common.Execution;
+using Microsoft.DotNet.XHarness.Common.Utilities;
 using Microsoft.DotNet.XHarness.Common.Logging;
 using Microsoft.DotNet.XHarness.iOS.Shared;
 using Microsoft.DotNet.XHarness.iOS.Shared.Utilities;
@@ -91,8 +93,19 @@ internal abstract class SimulatorsCommand : XHarnessCommand<SimulatorsCommandArg
     protected async Task<IEnumerable<Simulator>> GetAvailableSimulators()
     {
 
+        string indexXml = await GetSimulatorIndexXml() ?? throw new FailedToGetIndexException();
         var doc = new XmlDocument();
-        doc.LoadXml(await GetSimulatorIndexXml() ?? throw new FailedToGetIndexException());
+        var readerSettings = new XmlReaderSettings
+        {
+            XmlResolver = null,
+            DtdProcessing = DtdProcessing.Parse,
+            MaxCharactersFromEntities = SecureXmlReaderSettings.DefaultMaxCharactersFromEntities,
+        };
+        using (var stringReader = new StringReader(indexXml))
+        using (var xmlReader = XmlReader.Create(stringReader, readerSettings))
+        {
+            doc.Load(xmlReader);
+        }
 
         var simulators = new List<Simulator>();
 
@@ -234,6 +247,7 @@ internal abstract class SimulatorsCommand : XHarnessCommand<SimulatorsCommandArg
             }
 
             var runtimeIdentifier = simulatorRuntime + simulatorVersion.Replace('_', '-');
+            JsonPayloadSecurity.ThrowIfJsonStringTooLong(json, nameof(json));
             var simulators = JsonDocument.Parse(json);
 
             foreach (JsonProperty sim in simulators.RootElement.EnumerateObject())
@@ -369,7 +383,8 @@ internal abstract class SimulatorsCommand : XHarnessCommand<SimulatorsCommandArg
             indexUrl = $"https://devimages-cdn.apple.com/downloads/xcode/simulators/{indexName}";
         }
 
-        var tmpfile = Path.Combine(TempDirectory, indexName);
+            var tmpfile = Path.Combine(TempDirectory, indexName);
+        HostPathSecurity.ThrowIfUnsafeHostPath(tmpfile, nameof(tmpfile));
         if (!File.Exists(tmpfile))
         {
             if (!await DownloadFile(indexUrl, tmpfile))
@@ -391,6 +406,7 @@ internal abstract class SimulatorsCommand : XHarnessCommand<SimulatorsCommandArg
 
     private async Task<bool> DownloadFile(string url, string destinationPath)
     {
+        HostPathSecurity.ThrowIfUnsafeHostPath(destinationPath, nameof(destinationPath));
         try
         {
             Logger.LogInformation($"Downloading {url}...");

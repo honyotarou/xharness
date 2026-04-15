@@ -1,5 +1,8 @@
 variables:
   # Cannot use key:value syntax in root defined variables
+  # Omit full argv from xharness stdout in CI logs (see XHarnessEnvironmentOptions).
+  - name: XHARNESS_LOG_ISSUED_COMMAND
+    value: 'false'
   - name: _TeamName
     value: DotNetCore
   - name: HelixApiAccessToken

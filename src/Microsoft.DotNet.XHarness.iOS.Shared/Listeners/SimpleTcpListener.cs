@@ -1,4 +1,4 @@
-﻿// Licensed to the .NET Foundation under one or more agreements.
+// Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 // See the LICENSE file in the project root for more information.
 
@@ -10,6 +10,7 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.DotNet.XHarness.Common.Logging;
+using Microsoft.DotNet.XHarness.Common.Networking;
 
 #nullable enable
 namespace Microsoft.DotNet.XHarness.iOS.Shared.Listeners;
@@ -221,12 +222,32 @@ public class SimpleTcpListener : SimpleListener, ITunnelListener
         // now simply copy what we receive
         int i;
         int total = 0;
+        if (client.ReceiveTimeout == 0)
+        {
+            client.ReceiveTimeout = 120_000;
+        }
         NetworkStream stream = client.GetStream();
         while ((i = stream.Read(_buffer, 0, _buffer.Length)) != 0)
         {
-            TestLog.Write(_buffer, 0, i);
+            int allowed = TcpStreamLimits.AllowedReadLength(total, i, TcpStreamLimits.MaxTestLogStreamBytes);
+            if (allowed == 0)
+            {
+                Log.WriteLine(
+                    "Test log TCP stream exceeded maximum size ({0} bytes); stopping read.",
+                    TcpStreamLimits.MaxTestLogStreamBytes);
+                break;
+            }
+
+            TestLog.Write(_buffer, 0, allowed);
             TestLog.Flush();
-            total += i;
+            total += allowed;
+            if (allowed < i)
+            {
+                Log.WriteLine(
+                    "Test log TCP stream exceeded maximum size ({0} bytes); stopping read.",
+                    TcpStreamLimits.MaxTestLogStreamBytes);
+                break;
+            }
         }
 
         if (total < 16)

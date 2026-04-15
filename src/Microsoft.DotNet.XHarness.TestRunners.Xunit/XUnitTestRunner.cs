@@ -15,6 +15,8 @@ using System.Xml;
 using System.Xml.Linq;
 using System.Xml.Xsl;
 using Microsoft.DotNet.XHarness.Common;
+using Microsoft.DotNet.XHarness.Common.Utilities;
+using Microsoft.DotNet.XHarness.Common.Xml;
 using Microsoft.DotNet.XHarness.TestRunners.Common;
 using Xunit;
 using Xunit.Abstractions;
@@ -1002,7 +1004,7 @@ internal class XUnitTestRunner : XunitTestRunnerBase
             var generator = new XsltIdGenerator();
             xslArg.AddExtensionObject("urn:hash-generator", generator);
 
-            using (var xsltReader = XmlReader.Create(xsltStream))
+            using (var xsltReader = XmlReader.Create(xsltStream, SecureXmlReaderSettings.Create()))
             using (var xmlReader = element.CreateReader())
             {
                 xmlTransform.Load(xsltReader);
@@ -1030,6 +1032,7 @@ internal class XUnitTestRunner : XunitTestRunnerBase
             return null;
         }
 
+        HostPathSecurity.ThrowIfUnsafeHostPath(path, nameof(path));
         return File.OpenRead(path);
     }
 

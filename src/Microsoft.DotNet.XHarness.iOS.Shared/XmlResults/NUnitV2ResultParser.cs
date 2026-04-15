@@ -1,9 +1,10 @@
-﻿// Licensed to the .NET Foundation under one or more agreements.
+// Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 // See the LICENSE file in the project root for more information.
 
 using System.IO;
 using System.Xml;
+using Microsoft.DotNet.XHarness.Common.Xml;
 
 #nullable enable
 namespace Microsoft.DotNet.XHarness.iOS.Shared.XmlResults;
@@ -14,11 +15,12 @@ public class NUnitV2ResultParser : IXmlResultParser
     {
         long total, errors, failed, notRun, inconclusive, ignored, skipped, invalid;
         total = errors = failed = notRun = inconclusive = ignored = skipped = invalid = 0L;
+        long observedTotal = 0;
+        long observedFailed = 0;
+        long observedSkipped = 0;
 
-        var settings = new XmlReaderSettings
-        {
-            ValidationType = ValidationType.None
-        };
+        var settings = SecureXmlReaderSettings.Create();
+        settings.ValidationType = ValidationType.None;
 
         using (var reader = XmlReader.Create(stream, settings))
         {
@@ -34,6 +36,19 @@ public class NUnitV2ResultParser : IXmlResultParser
                     long.TryParse(reader["ignored"], out ignored);
                     long.TryParse(reader["skipped"], out skipped);
                     long.TryParse(reader["invalid"], out invalid);
+                }
+                else if (reader.NodeType == XmlNodeType.Element && reader.Name == "test-case")
+                {
+                    observedTotal++;
+                    var status = reader["result"];
+                    if (status == "Failure" || status == "Error")
+                    {
+                        observedFailed++;
+                    }
+                    else if (status == "Ignored")
+                    {
+                        observedSkipped++;
+                    }
                 }
 
                 if (humanReadableOutput != null && reader.NodeType == XmlNodeType.Element && reader.Name == "test-suite" && (reader["type"] == "TestFixture" || reader["type"] == "TestCollection"))
@@ -91,10 +106,13 @@ public class NUnitV2ResultParser : IXmlResultParser
             }
         }
 
+        // Security: do not trust summary attributes alone; if test-case nodes report failures, fail closed.
+        bool failedRun = errors != 0 || failed != 0 || observedFailed != 0;
+
         var passed = total - errors - failed - notRun - inconclusive - ignored - skipped - invalid;
         var resultLine = $"Tests run: {total} Passed: {passed} Inconclusive: {inconclusive} Failed: {failed + errors} Ignored: {ignored + skipped + invalid}";
         humanReadableOutput?.WriteLine(resultLine);
 
-        return (resultLine, errors != 0 || failed != 0);
+        return (resultLine, failedRun);
     }
 }

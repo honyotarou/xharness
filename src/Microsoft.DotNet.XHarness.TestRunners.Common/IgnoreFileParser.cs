@@ -7,6 +7,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Reflection;
 using System.Threading.Tasks;
+using Microsoft.DotNet.XHarness.Common.Utilities;
 
 namespace Microsoft.DotNet.XHarness.TestRunners.Common;
 
@@ -74,6 +75,7 @@ internal static class IgnoreFileParser
             return Array.Empty<string>();
         }
 
+        HostPathSecurity.ThrowIfUnsafeHostPath(contentDir, nameof(contentDir));
         var ignoredTests = new List<string>();
         foreach (var f in Directory.GetFiles(contentDir, "*.ignore"))
         {
@@ -88,6 +90,7 @@ internal static class IgnoreFileParser
 
     public static async Task<IEnumerable<string>> ParseTraitsFileAsync(string filePath)
     {
+        HostPathSecurity.ThrowIfUnsafeHostPath(filePath, nameof(filePath));
         var ignoredTraits = new List<string>();
         using var reader = new StreamReader(filePath);
         string line;
@@ -105,14 +108,18 @@ internal static class IgnoreFileParser
 
     public static Task<IEnumerable<string>> ParseTraitsContentFileAsync(string contentDir, bool isXUnit)
     {
+        HostPathSecurity.ThrowIfUnsafeHostPath(contentDir, nameof(contentDir));
         var ignoreFile = Path.Combine(contentDir, isXUnit ? "xunit-excludes.txt" : "nunit-excludes.txt");
+        HostPathSecurity.ThrowIfUnsafeHostPath(ignoreFile, nameof(ignoreFile));
         return ParseTraitsFileAsync(ignoreFile);
     }
 
     public static IEnumerable<string> ParseTraitsContentFile(string contentDir, bool isXUnit)
     {
+        HostPathSecurity.ThrowIfUnsafeHostPath(contentDir, nameof(contentDir));
         var ignoredTraits = new List<string>();
         var ignoreFile = Path.Combine(contentDir, isXUnit ? "xunit-excludes.txt" : "nunit-excludes.txt");
+        HostPathSecurity.ThrowIfUnsafeHostPath(ignoreFile, nameof(ignoreFile));
         using (var reader = new StreamReader(ignoreFile))
         {
             string line;
@@ -131,6 +138,7 @@ internal static class IgnoreFileParser
 
     public static IEnumerable<string> ParseContentFiles(string contentDir)
     {
+        HostPathSecurity.ThrowIfUnsafeHostPath(contentDir, nameof(contentDir));
         var ignoredTests = new List<string>();
         foreach (var f in Directory.GetFiles(contentDir, "*.ignore"))
         {

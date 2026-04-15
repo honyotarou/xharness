@@ -89,6 +89,65 @@ public class AdbRunnerTests : IDisposable
     }
 
     [Fact]
+    public void TryDumpAdbLog_RejectsUnsafeOutputPath()
+    {
+        var runner = new AdbRunner(_mainLog.Object, _processManager.Object, s_adbPath);
+        Assert.Throws<ArgumentException>(() => runner.TryDumpAdbLog("/tmp/../bad.log"));
+    }
+
+    [Fact]
+    public void PullFiles_RejectsUnsafeLocalPath()
+    {
+        var runner = new AdbRunner(_mainLog.Object, _processManager.Object, s_adbPath);
+        Assert.Throws<ArgumentException>(() => runner.PullFiles("pkg", "/sdcard", "/tmp/../out"));
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("   ")]
+    public void PullFiles_RejectsEmptyDevicePath(string devicePath)
+    {
+        var runner = new AdbRunner(_mainLog.Object, _processManager.Object, s_adbPath);
+        Assert.ThrowsAny<ArgumentException>(() => runner.PullFiles("pkg", devicePath, s_scratchAndOutputPath));
+    }
+
+    [Theory]
+    [InlineData("/data/local/tmp;id")]
+    [InlineData("/data/local/tmp|id")]
+    [InlineData("/data/local/tmp`id`")]
+    [InlineData("/data/local/tmp$(id)")]
+    [InlineData("/data/local/tmp\"bad\"")]
+    [InlineData("/data/local/tmp'bad'")]
+    [InlineData("-rf /")]
+    public void PullFiles_RejectsUnsafeDevicePath(string devicePath)
+    {
+        var runner = new AdbRunner(_mainLog.Object, _processManager.Object, s_adbPath);
+        Assert.Throws<ArgumentException>(() => runner.PullFiles("pkg", devicePath, s_scratchAndOutputPath));
+    }
+
+    [Theory]
+    [InlineData("/data/local/tmp;id")]
+    [InlineData("/data/local/tmp|id")]
+    [InlineData("-rf /")]
+    public void HeadlessPullFiles_RejectsUnsafeDevicePath(string devicePath)
+    {
+        var runner = new AdbRunner(_mainLog.Object, _processManager.Object, s_adbPath);
+        Assert.Throws<ArgumentException>(() => runner.HeadlessPullFiles(devicePath, s_scratchAndOutputPath));
+    }
+
+    [Theory]
+    [InlineData("run.sh;id")]
+    [InlineData("run.sh|id")]
+    [InlineData("run bad.sh")]
+    [InlineData("-rf")]
+    public void RunHeadlessCommand_RejectsUnsafeScriptName(string testScript)
+    {
+        var runner = new AdbRunner(_mainLog.Object, _processManager.Object, s_adbPath);
+        Assert.Throws<ArgumentException>(() => runner.RunHeadlessCommand("tests", "runtime", "assembly.dll", testScript, TimeSpan.FromSeconds(1)));
+    }
+
+    [Fact]
     public void DumpBugReport()
     {
         var runner = new AdbRunner(_mainLog.Object, _processManager.Object, s_adbPath);
@@ -184,6 +243,24 @@ public class AdbRunnerTests : IDisposable
         string fakeApkName = $"{Path.GetRandomFileName()}";
         int exitCode = runner.KillApk(fakeApkName);
         VerifyAdbCall("shell", "am", "kill", "--user", "all", fakeApkName);
+        Assert.Equal(0, exitCode);
+    }
+
+    [Fact]
+    public void KillProcess_RejectsUnsafeName()
+    {
+        var runner = new AdbRunner(_mainLog.Object, _processManager.Object, s_adbPath);
+        Assert.Throws<ArgumentException>(() => runner.KillProcess(".*"));
+        Assert.Throws<ArgumentException>(() => runner.KillProcess("--help"));
+    }
+
+    [Fact]
+    public void KillProcess_UsesPidofAndKillNotPkill()
+    {
+        var runner = new AdbRunner(_mainLog.Object, _processManager.Object, s_adbPath);
+        int exitCode = runner.KillProcess("net.dot.E");
+        VerifyAdbCall("shell", "pidof", "net.dot.E");
+        VerifyAdbCall("shell", "kill", "-9", "1234");
         Assert.Equal(0, exitCode);
     }
 
@@ -429,6 +506,12 @@ public class AdbRunnerTests : IDisposable
                 if (string.Join(" ", arguments.Skip(argStart).Take(5)).Equals("shell pm list packages -3"))
                 {
                     stdOut = "package:" + string.Join("\npackage:", _fakeDeviceList.Single(d => d.DeviceSerial == s_currentDeviceSerial).InstalledApplications);
+                }
+
+                if (arguments.Length >= argStart + 2 && arguments[argStart + 1].Equals("pidof", StringComparison.Ordinal))
+                {
+                    // Return a single PID for tests.
+                    stdOut = "1234";
                 }
 
                 exitCode = 0;

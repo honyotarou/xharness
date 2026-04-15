@@ -1,4 +1,4 @@
-﻿// Licensed to the .NET Foundation under one or more agreements.
+// Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 // See the LICENSE file in the project root for more information.
 
@@ -7,6 +7,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Runtime.Loader;
+using Microsoft.DotNet.XHarness.Common.Utilities;
 
 namespace Microsoft.DotNet.XHarness.CLI.CommandArguments;
 
@@ -25,6 +26,7 @@ internal class TypeFromAssemblyArgument<T> : Argument<IList<(string path, string
     {
         foreach ((string assemblyPath, string? typeName) in Value)
         {
+            HostPathSecurity.ThrowIfUnsafeHostPath(assemblyPath, nameof(assemblyPath));
             var extensionAssembly = AssemblyLoadContext.Default.LoadFromAssemblyPath(Path.GetFullPath(assemblyPath));
             var loadedType = extensionAssembly?.GetTypes().Where(type => type.FullName == typeName).FirstOrDefault();
             if (loadedType is null)
@@ -56,6 +58,8 @@ internal class TypeFromAssemblyArgument<T> : Argument<IList<(string path, string
             {
                 throw new ArgumentException($"Empty path to assembly");
             }
+
+            HostPathSecurity.ThrowIfUnsafeHostPath(path.Trim(), nameof(path));
 
             if (!File.Exists(path))
             {

@@ -1,4 +1,4 @@
-﻿// Licensed to the .NET Foundation under one or more agreements.
+// Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 // See the LICENSE file in the project root for more information.
 
@@ -310,6 +310,7 @@ public abstract class AppRunnerBase
     {
         var logReadTokenSource = new CancellationTokenSource();
         var log = _logs.Create($"{appName}.log", LogType.SystemLog.ToString(), timestamp: false);
+        var safeAppNameForPredicate = appName.Replace("'", "\\'", StringComparison.Ordinal);
         var logArgs = args.Concat(new[]
         {
             "stream",
@@ -317,7 +318,7 @@ public abstract class AppRunnerBase
             "--color=none",
             "--style=compact",
             "--predicate",
-            $"senderImagePath contains '{appName}'"
+            $"senderImagePath contains '{safeAppNameForPredicate}'"
         }).ToArray();
 
         _mainLog.WriteLine($"Scanning log stream for {appName} into '{log.FullPath}'..");
