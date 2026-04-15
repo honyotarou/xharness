@@ -17,7 +17,7 @@ public class TcpListenerAddressResolverTests
         try
         {
             System.Environment.SetEnvironmentVariable(TcpListenerAddressResolver.BindLoopbackOnlyVariableName, null);
-            Assert.Equal(IPAddress.Any, TcpListenerAddressResolver.GetListenAddress());
+            Assert.Equal(IPAddress.Loopback, TcpListenerAddressResolver.GetListenAddress());
 
             System.Environment.SetEnvironmentVariable(TcpListenerAddressResolver.BindLoopbackOnlyVariableName, "true");
             Assert.Equal(IPAddress.Loopback, TcpListenerAddressResolver.GetListenAddress());
@@ -44,8 +44,8 @@ public class TcpListenerAddressResolverTests
         try
         {
             System.Environment.SetEnvironmentVariable(TcpListenerAddressResolver.BindLoopbackOnlyVariableName, null);
-            Assert.Equal(IPAddress.Any, TcpListenerAddressResolver.GetListenAddress());
-            Assert.Equal("*", TcpListenerAddressResolver.GetHttpListenerPrefixHost());
+            Assert.Equal(IPAddress.Loopback, TcpListenerAddressResolver.GetListenAddress());
+            Assert.Equal("127.0.0.1", TcpListenerAddressResolver.GetHttpListenerPrefixHost());
 
             System.Environment.SetEnvironmentVariable(TcpListenerAddressResolver.BindLoopbackOnlyVariableName, "true");
             Assert.Equal(IPAddress.Loopback, TcpListenerAddressResolver.GetListenAddress());
@@ -92,8 +92,8 @@ public class TcpListenerAddressResolverTests
         try
         {
             System.Environment.SetEnvironmentVariable(TcpListenerAddressResolver.BindLoopbackOnlyVariableName, "   ");
-            Assert.Equal(IPAddress.Any, TcpListenerAddressResolver.GetListenAddress());
-            Assert.Equal("*", TcpListenerAddressResolver.GetHttpListenerPrefixHost());
+            Assert.Equal(IPAddress.Loopback, TcpListenerAddressResolver.GetListenAddress());
+            Assert.Equal("127.0.0.1", TcpListenerAddressResolver.GetHttpListenerPrefixHost());
         }
         finally
         {

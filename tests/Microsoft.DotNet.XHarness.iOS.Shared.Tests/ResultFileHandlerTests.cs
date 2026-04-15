@@ -402,7 +402,7 @@ public class ResultFileHandlerTests : IDisposable
     private static string GetArgumentValue(MlaunchArguments args, string argumentName)
     {
         string prefix = $"--{argumentName}=";
-        string argument = args.Select(a => a.AsCommandLineArgument())
+        string argument = args.Select(a => a.AsCommandLineArgument().Trim('"'))
             .First(a => a.StartsWith(prefix, StringComparison.Ordinal));
 
         return argument.Substring(prefix.Length).Trim('"');

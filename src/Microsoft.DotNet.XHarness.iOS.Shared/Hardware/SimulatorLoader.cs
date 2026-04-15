@@ -1,4 +1,4 @@
-﻿// Licensed to the .NET Foundation under one or more agreements.
+// Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 // See the LICENSE file in the project root for more information.
 
@@ -69,7 +69,9 @@ public class SimulatorLoader : ISimulatorLoader
             _availableDevicePairs.Reset();
         }
 
-        var tmpfile = Path.GetTempFileName();
+        var privateTempRoot = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "xharness", "tmp");
+        Directory.CreateDirectory(privateTempRoot);
+        var tmpfile = Path.Combine(privateTempRoot, Path.GetRandomFileName() + ".xml");
 
         try
         {

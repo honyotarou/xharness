@@ -13,6 +13,7 @@ using System.Xml;
 using Microsoft.DotNet.XHarness.CLI.CommandArguments.Apple.Simulators;
 using Microsoft.DotNet.XHarness.Common.CLI;
 using Microsoft.DotNet.XHarness.Common.Utilities;
+using Microsoft.DotNet.XHarness.Common.Xml;
 using Microsoft.Extensions.Logging;
 
 namespace Microsoft.DotNet.XHarness.CLI.Commands.Apple.Simulators;
@@ -247,7 +248,12 @@ internal class InstallCommand : SimulatorsCommand
             }
         }
 
-        using (var response = await httpClient.GetAsync(simulator.Source, HttpCompletionOption.ResponseHeadersRead))
+        if (!Uri.TryCreate(simulator.Source, UriKind.Absolute, out var downloadUri) || !string.Equals(downloadUri.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException($"Simulator download URL must be absolute HTTPS: {simulator.Source}");
+        }
+
+        using (var response = await httpClient.GetAsync(downloadUri, HttpCompletionOption.ResponseHeadersRead))
         {
             response.EnsureSuccessStatusCode();
 
@@ -300,6 +306,11 @@ internal class InstallCommand : SimulatorsCommand
         watch.Stop();
 
         var size = new FileInfo(downloadPath).Length;
+        if (size != simulator.FileSize)
+        {
+            File.Delete(downloadPath);
+            throw new InvalidOperationException($"Downloaded simulator size ({size} bytes) does not match expected size ({simulator.FileSize} bytes).");
+        }
         Logger.LogInformation($"Downloaded {size / 1024.0 / 1024.0:N1} MB in {watch.Elapsed:hh\\:mm\\:ss}");
     }
 
@@ -370,7 +381,11 @@ internal class InstallCommand : SimulatorsCommand
                         var packageInfoPath = Path.Combine(expanded_path, "PackageInfo");
                         HostPathSecurity.ThrowIfUnsafeHostPath(packageInfoPath, nameof(packageInfoPath));
                         var packageInfoDoc = new XmlDocument();
-                        packageInfoDoc.Load(packageInfoPath);
+                        using (var fs = File.OpenRead(packageInfoPath))
+                        using (var reader = XmlReader.Create(fs, SecureXmlReaderSettings.Create(ignoreWhitespace: true)))
+                        {
+                            packageInfoDoc.Load(reader);
+                        }
                         // Add the install-location attribute to the pkg-info node
                         var attr = packageInfoDoc.CreateAttribute("install-location");
                         attr.Value = simulator.InstallPrefix;

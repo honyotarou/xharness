@@ -189,7 +189,9 @@ public class ResultFileHandler : IResultFileHandler
         _mainLog.WriteLine("Attempting to retrieve crash report from device...");
 
         // List all crash reports on the device
-        string tempCrashListFile = Path.GetTempFileName();
+        var privateTempRoot = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "xharness", "tmp");
+        Directory.CreateDirectory(privateTempRoot);
+        string tempCrashListFile = Path.Combine(privateTempRoot, Path.GetRandomFileName() + ".txt");
 
         MlaunchArguments listArgs = new MlaunchArguments(new ListCrashReportsArgument(tempCrashListFile));
 
@@ -247,7 +249,9 @@ public class ResultFileHandler : IResultFileHandler
         }
         else
         {
-            crashReportContent = Path.GetTempFileName();
+            var privateTempRoot2 = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "xharness", "tmp");
+            Directory.CreateDirectory(privateTempRoot2);
+            crashReportContent = Path.Combine(privateTempRoot2, Path.GetRandomFileName() + ".txt");
         }
 
         MlaunchArguments downloadArgs = new MlaunchArguments(

@@ -213,7 +213,7 @@ public class TestReporter : ITestReporter
         var reader = JsonReaderWriterFactory.CreateJsonReader(Encoding.UTF8.GetBytes(text), new XmlDictionaryReaderQuotas());
         var doc = new XmlDocument();
         doc.Load(reader);
-        foreach (XmlNode? node in doc.SelectNodes($"/root/processes/item[pid = '" + pid + "']"))
+        foreach (XmlNode? node in doc.SelectNodes($"/root/processes/item[pid = {pid}]"))
         {
             Console.WriteLine(node?.InnerXml);
             Console.WriteLine(node?.SelectSingleNode("reason")?.InnerText);

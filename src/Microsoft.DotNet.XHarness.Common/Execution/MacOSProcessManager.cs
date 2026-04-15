@@ -12,6 +12,7 @@ using System.Threading.Tasks;
 using System.Xml;
 using Microsoft.DotNet.XHarness.Common.CLI;
 using Microsoft.DotNet.XHarness.Common.Logging;
+using Microsoft.DotNet.XHarness.Common.Xml;
 
 namespace Microsoft.DotNet.XHarness.Common.Execution;
 
@@ -39,13 +40,18 @@ public class MacOSProcessManager : UnixProcessManager, IMacOSProcessManager
         {
             if (_xcode_version == null)
             {
-                var doc = new XmlDocument();
                 var plistPath = Path.Combine(XcodeRoot, "Contents", "version.plist");
 
                 try
                 {
-                    doc.Load(plistPath);
-                    _xcode_version = Version.Parse(doc.SelectSingleNode("//key[text() = 'CFBundleShortVersionString']/following-sibling::string")?.InnerText ?? throw new Exception("Failed to find the CFBundleShortVersionString property"));
+                    var doc = new XmlDocument();
+                    using (var fs = File.OpenRead(plistPath))
+                    using (var reader = XmlReader.Create(fs, SecureXmlReaderSettings.Create(ignoreWhitespace: true)))
+                    {
+                        doc.Load(reader);
+                    }
+                    _xcode_version = Version.Parse(doc.SelectSingleNode("//key[text() = 'CFBundleShortVersionString']/following-sibling::string")?.InnerText
+                        ?? throw new Exception("Failed to find the CFBundleShortVersionString property"));
                 }
                 catch (IOException e)
                 {

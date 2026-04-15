@@ -22,7 +22,7 @@ public class SimpleListenerBindAddressTests
         {
             Environment.SetEnvironmentVariable(TcpListenerAddressResolver.BindLoopbackOnlyVariableName, null);
             using var any = new SimpleListenerAddressProbe(new Mock<ILog>().Object, new Mock<IFileBackedLog>().Object);
-            Assert.Equal(IPAddress.Any, any.ListenAddress);
+            Assert.Equal(IPAddress.Loopback, any.ListenAddress);
 
             Environment.SetEnvironmentVariable(TcpListenerAddressResolver.BindLoopbackOnlyVariableName, "true");
             using var loopback = new SimpleListenerAddressProbe(new Mock<ILog>().Object, new Mock<IFileBackedLog>().Object);

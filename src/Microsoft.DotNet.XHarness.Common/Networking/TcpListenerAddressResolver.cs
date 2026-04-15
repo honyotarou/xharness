@@ -16,9 +16,9 @@ public static class TcpListenerAddressResolver
 {
     /// <summary>
     /// Environment variable: when true or 1, listeners bind to loopback only (127.0.0.1 / ::1),
-    /// reducing exposure on shared networks. Unset or whitespace-only defaults to <see cref="IPAddress.Any"/>
-    /// so physical devices on the LAN can still reach the host when required. Unrecognized non-empty values
-    /// fail closed to loopback (attacker: typos must not widen bind to LAN).
+    /// reducing exposure on shared networks. Unset or whitespace-only defaults to <see cref="IPAddress.Loopback"/>
+    /// (secure-by-default). Set to false or 0 to bind to <see cref="IPAddress.Any"/> when physical devices on the LAN
+    /// must reach the host. Unrecognized non-empty values fail closed to loopback (attacker: typos must not widen bind to LAN).
     /// </summary>
     public const string BindLoopbackOnlyVariableName = "XHARNESS_TCP_BIND_LOOPBACK_ONLY";
 
@@ -27,7 +27,7 @@ public static class TcpListenerAddressResolver
         string? v = Environment.GetEnvironmentVariable(BindLoopbackOnlyVariableName);
         if (string.IsNullOrWhiteSpace(v))
         {
-            return IPAddress.Any;
+            return IPAddress.Loopback;
         }
 
         v = v.Trim();
