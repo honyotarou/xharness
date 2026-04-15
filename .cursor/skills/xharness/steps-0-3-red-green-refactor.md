@@ -6,6 +6,18 @@
 
 **カプセル化は Step 7 待ちにしない**: **ProjectReference レイヤー**と **`allowedProjectReferences`**（LINE の `ROUTE_LINE_CAPS` に相当）は **Step 4〜5 と同時進行**で守る。PR の **CI は dotnet build の直前**に `check-encapsulation` が走る（[steps-harness.md](steps-harness.md)）。**後からまとめて直させない**。
 
+## pre / post（lineskill 互換）
+
+### pre（入口条件）
+
+- Step 2（harness）を把握している（[steps-harness.md](steps-harness.md)）
+- 触る `src/` と対応する `tests/*.Tests` が決まっている
+
+### post（出口条件）
+
+- Step 4〜6 の局所テストが緑
+- **このファイル単体では完了ではない**。必ず Step 7（[steps-4-8-gates.md](steps-4-8-gates.md)）で `pnpm harness` を緑にして退出
+
 ### エージェント（Cursor 等）— Step 4〜6 のあと **自走して Step 7 まで**
 
 ユーザーが **Step 4〜6 だけ**を依頼した場合でも、**Step 6 が緑で終わった時点で止まらない**。**同じターン／セッションで Step 7 に進み**、[steps-4-8-gates.md](steps-4-8-gates.md) Step 7 に従い **`pnpm harness`**（または `npm run harness`）を**実行して結果を確認**する。「次は Step 7 ですか？」**と聞いて待たない**。
