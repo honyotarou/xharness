@@ -143,6 +143,7 @@ internal class WasmBrowserTestRunner
                 if (int.TryParse(testsDoneElement.Text, out var code))
                 {
                     var appExitCode = (ExitCode)Enum.ToObject(typeof(ExitCode), code);
+                    appExitCode = ValidateExitCodeAgainstLogs(appExitCode, logProcessorExitCode, _messagesProcessor.ForwardedExitCode, _messagesProcessor.LineThatMatchedErrorPattern);
                     if (logProcessorExitCode != ExitCode.SUCCESS)
                     {
                         _logger.LogInformation($"Application has finished with exit code {appExitCode}. But the log processor failed with {logProcessorExitCode}.");
@@ -170,6 +171,25 @@ internal class WasmBrowserTestRunner
                 cts.Cancel();
             }
         }
+    }
+
+    internal static ExitCode ValidateExitCodeAgainstLogs(ExitCode domExitCode, ExitCode logProcessorExitCode, int? forwardedExitCode, string? lineThatMatchedErrorPattern)
+    {
+        // Security: do not allow a forged DOM exit code to claim success if logs indicate failure.
+        if (domExitCode == ExitCode.SUCCESS)
+        {
+            if (!string.IsNullOrEmpty(lineThatMatchedErrorPattern))
+            {
+                return ExitCode.TESTS_FAILED;
+            }
+
+            if (forwardedExitCode.HasValue && forwardedExitCode.Value != 0)
+            {
+                return ExitCode.TESTS_FAILED;
+            }
+        }
+
+        return domExitCode;
     }
 
     private async Task RunConsoleMessagesPump(WebSocket socket, CancellationToken token)

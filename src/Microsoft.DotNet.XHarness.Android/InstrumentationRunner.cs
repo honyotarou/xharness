@@ -1,4 +1,4 @@
-﻿// Licensed to the .NET Foundation under one or more agreements.
+// Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 // See the LICENSE file in the project root for more information.
 
@@ -239,8 +239,27 @@ public class InstrumentationRunner
 
                 if (outputs.ContainsKey(key))
                 {
+                    var existing = outputs[key];
                     _logger.LogWarning($"Key '{key}' defined more than once");
-                    outputs[key] = value;
+
+                    // Security: do not allow a later value to downgrade a failure to success.
+                    if (string.Equals(key, "return-code", StringComparison.OrdinalIgnoreCase))
+                    {
+                        if (int.TryParse(existing, out var existingCode) && int.TryParse(value, out var newCode))
+                        {
+                            // Prefer a non-zero (failure) if either indicates failure.
+                            outputs[key] = (existingCode != 0 || newCode != 0) ? Math.Max(existingCode, newCode).ToString() : "0";
+                        }
+                        else
+                        {
+                            // On parse failure, fail closed to non-zero so tests don't get marked success incorrectly.
+                            outputs[key] = "1";
+                        }
+                    }
+                    else
+                    {
+                        outputs[key] = value;
+                    }
                 }
                 else
                 {

@@ -4,6 +4,7 @@
 
 using System;
 using System.IO;
+using System.Threading.Tasks;
 using Microsoft.DotNet.XHarness.CLI.Commands.Wasm;
 using Microsoft.DotNet.XHarness.Common.Utilities;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -97,5 +98,37 @@ public class WasmTestMessagesProcessorSecurityTests
         Assert.True(m.Success);
         Assert.False(WasmXmlResultPayloadDecoder.TryDecodeXmlResultLine(m, maxDecodedBytes: 10_000, out var bytes, out _));
         Assert.Null(bytes);
+    }
+
+    [Fact]
+    public async Task ProcessMessage_IgnoresDuplicateStartResultXml()
+    {
+        var tmp = Path.Combine(Path.GetTempPath(), "wasm-xml-" + Guid.NewGuid().ToString("N") + ".xml");
+        var outTxt = Path.Combine(Path.GetTempPath(), "wasm-out-" + Guid.NewGuid().ToString("N") + ".txt");
+        try
+        {
+            File.WriteAllText(tmp, "");
+            var p = new WasmTestMessagesProcessor(tmp, outTxt, NullLogger.Instance);
+            using var cts = new System.Threading.CancellationTokenSource();
+            var runner = p.RunAsync(cts.Token);
+
+            var payload1 = new byte[] { 1, 2, 3 };
+            var payload2 = new byte[] { 9, 9, 9 };
+            p.Invoke($"STARTRESULTXML {payload1.Length} {Convert.ToBase64String(payload1)} ENDRESULTXML");
+            p.Invoke($"STARTRESULTXML {payload2.Length} {Convert.ToBase64String(payload2)} ENDRESULTXML");
+
+            // Stop the processor and ensure pending messages were handled.
+            _ = await p.CompleteAndFlushAsync();
+            cts.Cancel();
+            try { await runner; } catch { }
+
+            var written = File.ReadAllBytes(tmp);
+            Assert.Equal(payload1, written);
+        }
+        finally
+        {
+            if (File.Exists(tmp)) File.Delete(tmp);
+            if (File.Exists(outTxt)) File.Delete(outTxt);
+        }
     }
 }

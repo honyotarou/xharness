@@ -1,4 +1,4 @@
-﻿// Licensed to the .NET Foundation under one or more agreements.
+// Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 // See the LICENSE file in the project root for more information.
 
@@ -180,6 +180,21 @@ public class ExitCodeDetectorTests : IDisposable
         var exitCode = new iOSExitCodeDetector().DetectExitCode(appBundleInformation, captureLog);
 
         Assert.Equal(72, exitCode);
+    }
+
+    [Fact]
+    public void LastExitCodeWins_WhenMultipleExitCodeLinesAppear()
+    {
+        var app = new AppBundleInformation("MyApp", "MyApp", "some/path", "some/path", false, null, bundleExecutable: "MyApp");
+        var log = GetLogMock(new[]
+        {
+            "2022-03-18 12:48:53.336 I  MyApp DOTNET.APP_EXIT_CODE: 0",
+            "some other noise",
+            "2022-03-18 12:48:54.336 I  MyApp DOTNET.APP_EXIT_CODE: 1",
+        });
+
+        var exitCode = new iOSExitCodeDetector().DetectExitCode(app, log);
+        Assert.Equal(1, exitCode);
     }
 
     public void Dispose()

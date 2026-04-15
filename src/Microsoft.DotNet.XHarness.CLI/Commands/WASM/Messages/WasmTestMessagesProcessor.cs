@@ -42,6 +42,7 @@ public class WasmTestMessagesProcessor
     private readonly TaskCompletionSource _completed = new ();
     private bool _isRunning => !_completed.Task.IsCompleted;
     private bool _loggedProcessorStopped = false;
+    private bool _xmlResultsWritten = false;
 
     public string? LineThatMatchedErrorPattern { get; private set; }
 
@@ -211,6 +212,13 @@ public class WasmTestMessagesProcessor
         var match = XmlResultLineRegex.Match(line);
         if (match.Success)
         {
+            if (_xmlResultsWritten)
+            {
+                // Security: do not allow later STARTRESULTXML lines to overwrite earlier results.
+                _logger.LogWarning("Ignoring duplicate embedded XML result line (results were already written).");
+                return;
+            }
+
             if (!WasmXmlResultPayloadDecoder.TryDecodeXmlResultLine(match, WasmXmlResultPayloadDecoder.MaxDecodedXmlResultBytes, out var bytes, out var expectedLength) || bytes == null)
             {
                 _logger.LogWarning("Rejected embedded XML result line: invalid length or base64, or payload exceeds maximum decoded size.");
@@ -229,6 +237,7 @@ public class WasmTestMessagesProcessor
                         _logger.LogInformation($"Received {bytes.Length} of {_xmlResultsFilePath} but expected {expectedLength}");
                     }
                 }
+                _xmlResultsWritten = true;
             }
         }
         else

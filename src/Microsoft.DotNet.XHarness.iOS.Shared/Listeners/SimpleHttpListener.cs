@@ -8,11 +8,14 @@ using System.Net;
 using System.Net.Sockets;
 using Microsoft.DotNet.XHarness.Common.Logging;
 using Microsoft.DotNet.XHarness.Common.Networking;
+using Microsoft.DotNet.XHarness.Common.Utilities;
 
 namespace Microsoft.DotNet.XHarness.iOS.Shared.Listeners;
 
 public class SimpleHttpListener : SimpleListener
 {
+    public const int MaxRequestBodyBytes = TcpStreamLimits.MaxTestLogStreamBytes;
+
     private readonly bool _autoExit;
     private HttpListener _server;
     private bool _connected_once;
@@ -99,14 +102,12 @@ public class SimpleHttpListener : SimpleListener
         var request = context.Request;
         var response = "OK";
 
-        var stream = request.InputStream;
-        var data = string.Empty;
-        using (var reader = new StreamReader(stream))
+        string data = string.Empty;
+        if (request.HasEntityBody)
         {
-            data = reader.ReadToEnd();
+            // Bound in-memory read (attacker: hostile device sends a huge body).
+            data = StreamReadLimits.ReadToEndWithByteLimit(request.InputStream, MaxRequestBodyBytes);
         }
-
-        stream.Close();
 
         switch (request.RawUrl)
         {
@@ -140,5 +141,6 @@ public class SimpleHttpListener : SimpleListener
 
         return finished;
     }
+
 }
 

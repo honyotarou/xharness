@@ -14,6 +14,7 @@ using System.Xml;
 using Microsoft.DotNet.XHarness.Common;
 using Microsoft.DotNet.XHarness.Common.Execution;
 using Microsoft.DotNet.XHarness.Common.Logging;
+using Microsoft.DotNet.XHarness.Common.Networking;
 using Microsoft.DotNet.XHarness.Common.Utilities;
 using Microsoft.DotNet.XHarness.iOS.Shared.Execution;
 using Microsoft.DotNet.XHarness.iOS.Shared.Listeners;
@@ -208,9 +209,18 @@ public class TestReporter : ITestReporter
     {
         crashReason = null;
         using var crashReader = crashLog.GetReader(); // dispose when we leave the method
-        var text = crashReader.ReadToEnd();
+        var text = StreamReadLimits.ReadToEndWithByteLimit(crashReader.BaseStream, TcpStreamLimits.MaxTestLogStreamBytes);
+        JsonPayloadSecurity.ThrowIfJsonStringTooLong(text, nameof(crashLog));
 
-        var reader = JsonReaderWriterFactory.CreateJsonReader(Encoding.UTF8.GetBytes(text), new XmlDictionaryReaderQuotas());
+        var quotas = new XmlDictionaryReaderQuotas
+        {
+            MaxStringContentLength = 1024 * 1024,
+            MaxArrayLength = 1024 * 1024,
+            MaxBytesPerRead = 4096,
+            MaxDepth = 256,
+            MaxNameTableCharCount = 1024 * 1024,
+        };
+        var reader = JsonReaderWriterFactory.CreateJsonReader(Encoding.UTF8.GetBytes(text), quotas);
         var doc = new XmlDocument();
         doc.Load(reader);
         foreach (XmlNode? node in doc.SelectNodes($"/root/processes/item[pid = {pid}]"))

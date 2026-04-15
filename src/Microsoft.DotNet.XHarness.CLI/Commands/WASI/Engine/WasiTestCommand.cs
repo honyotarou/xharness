@@ -151,7 +151,9 @@ internal class WasiTestCommand : XHarnessCommand<WasiTestCommandArguments>
             if (logProcessor.ForwardedExitCode != null)
             {
                 // until WASI can work with unix exit code https://github.com/WebAssembly/wasi-cli/pull/44
-                result.ExitCode = logProcessor.ForwardedExitCode.Value;
+                // Security: never allow stdout to downgrade a failing process exit code to success.
+                // Allow forwarded non-zero to mark failure even if process exits 0.
+                result.ExitCode = ApplyForwardedExitCode(result.ExitCode, logProcessor.ForwardedExitCode);
             }
 
             if (result.ExitCode != Arguments.ExpectedExitCode)
@@ -189,5 +191,21 @@ internal class WasiTestCommand : XHarnessCommand<WasiTestCommandArguments>
                         stderrLog: new CallbackLog(msg => logger.LogError(msg.Trim())),
                         TimeSpan.FromSeconds(10));
         }
+    }
+
+    internal static int ApplyForwardedExitCode(int processExitCode, int? forwardedExitCode)
+    {
+        if (forwardedExitCode == null)
+        {
+            return processExitCode;
+        }
+
+        int forwarded = forwardedExitCode.Value;
+        if (forwarded != 0 || processExitCode == 0)
+        {
+            return forwarded;
+        }
+
+        return processExitCode;
     }
 }

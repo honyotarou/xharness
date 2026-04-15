@@ -45,18 +45,24 @@ public abstract class ExitCodeDetector : IExitCodeDetector
             throw new Exception("Failed to detect application's exit code. The log file was empty / not found at " + e.FileName, e);
         }
 
+        int? detected = null;
         using (reader)
         while (!reader.EndOfStream)
         {
-            if (reader.ReadLine() is string line
-                && IsSignalLine(appBundleInfo, line) is Match match && match.Success
-                && int.TryParse(match.Groups["exitCode"].Value, out var exitCode))
+            if (reader.ReadLine() is not string line)
             {
-                return exitCode;
+                continue;
+            }
+
+            if (IsSignalLine(appBundleInfo, line) is Match match && match.Success &&
+                int.TryParse(match.Groups["exitCode"].Value, out var exitCode))
+            {
+                // Last match wins (attacker: early forged 0 should not override later real failure).
+                detected = exitCode;
             }
         }
 
-        return null;
+        return detected;
     }
 
     protected virtual Match? IsSignalLine(AppBundleInformation appBundleInfo, string logLine)
