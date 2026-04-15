@@ -4,6 +4,9 @@
 
 using System;
 using System.IO;
+using System.Runtime.InteropServices;
+using System.ComponentModel;
+using Microsoft.Win32.SafeHandles;
 using Microsoft.DotNet.XHarness.Common.CLI;
 
 namespace Microsoft.DotNet.XHarness.Common.Utilities;
@@ -147,4 +150,47 @@ public static class HostPathSecurity
             throw new ArgumentException("Path escapes the base directory.", paramName);
         }
     }
+
+    /// <summary>
+    /// Opens a new file for write under <paramref name="baseDirectory"/> while attempting to avoid symlink races.
+    /// On Unix, uses O_NOFOLLOW on the final path component (best-effort; does not protect every parent directory component).
+    /// </summary>
+    public static FileStream OpenNewFileForWriteUnderBase(string baseDirectory, string fullPath, string paramName)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(baseDirectory);
+        ArgumentException.ThrowIfNullOrEmpty(fullPath);
+
+        ThrowIfUnsafeHostPath(baseDirectory, nameof(baseDirectory));
+        ThrowIfUnsafeHostPath(fullPath, paramName);
+        ThrowIfResolvedPathNotUnderBase(baseDirectory, fullPath, paramName);
+
+        Directory.CreateDirectory(Path.GetDirectoryName(fullPath) ?? baseDirectory);
+
+        if (OperatingSystem.IsWindows())
+        {
+            return new FileStream(fullPath, FileMode.CreateNew, FileAccess.Write, FileShare.None);
+        }
+
+        return OpenNewFileUnixNoFollow(fullPath, paramName);
+    }
+
+    private static FileStream OpenNewFileUnixNoFollow(string fullPath, string paramName)
+    {
+        const int O_WRONLY = 0x0001;
+        const int O_CREAT = 0x0200;
+        const int O_EXCL = 0x0800;
+        const int O_NOFOLLOW = 0x0100;
+
+        int fd = open(fullPath, O_WRONLY | O_CREAT | O_EXCL | O_NOFOLLOW, 0x180 /* 0600 */);
+        if (fd < 0)
+        {
+            throw new IOException($"Failed to create file securely: {fullPath}", new Win32Exception(Marshal.GetLastWin32Error()));
+        }
+
+        var handle = new SafeFileHandle((IntPtr)fd, ownsHandle: true);
+        return new FileStream(handle, FileAccess.Write);
+    }
+
+    [DllImport("libc", SetLastError = true)]
+    private static extern int open(string pathname, int flags, int mode);
 }

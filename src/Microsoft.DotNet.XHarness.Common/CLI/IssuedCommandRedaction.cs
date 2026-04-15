@@ -14,6 +14,7 @@ public static class IssuedCommandRedaction
     private static readonly string[] SensitiveKeySubstrings =
     {
         "token", "password", "secret", "auth", "bearer", "credential", "apikey",
+        "key", "cert", "passphrase", "connection", "cookie",
     };
 
     /// <summary>
@@ -29,10 +30,74 @@ public static class IssuedCommandRedaction
         var parts = new string[args.Length];
         for (int i = 0; i < args.Length; i++)
         {
-            parts[i] = RedactSingleArgument(args[i]);
+            string cur = args[i];
+            parts[i] = RedactSingleArgument(cur);
+
+            // Handle "--key value" (space-separated) form.
+            // If current token is a sensitive flag name, redact the next token as its value.
+            if (LooksLikeSensitiveKeyToken(cur) && i + 1 < args.Length)
+            {
+                parts[i + 1] = "[REDACTED]";
+                i++; // skip next, we've already emitted it
+            }
         }
 
         return string.Join(' ', parts);
+    }
+
+    private static bool LooksLikeSensitiveKeyToken(string token)
+    {
+        if (string.IsNullOrEmpty(token))
+        {
+            return false;
+        }
+
+        // We only treat leading-dash tokens as keys. Non-dash tokens (positional args) are not keys.
+        if (!token.StartsWith("-", StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        // If this token already contains an explicit "=value", it is not the "--key value" form.
+        if (token.Contains('=', StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        // Remove leading '-' and stop at '=' if present.
+        var span = token.AsSpan().TrimStart('-');
+        int eq = span.IndexOf('=');
+        if (eq >= 0)
+        {
+            span = span[..eq];
+        }
+
+        // Normalize things like "--foo:" or "--foo," in case a consumer formats flags oddly.
+        while (!span.IsEmpty)
+        {
+            char last = span[^1];
+            if (last is ':' or ',' or ';')
+            {
+                span = span[..^1];
+                continue;
+            }
+            break;
+        }
+        if (span.IsEmpty)
+        {
+            return false;
+        }
+
+        string key = span.ToString();
+        foreach (string needle in SensitiveKeySubstrings)
+        {
+            if (key.Contains(needle, StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private static string RedactSingleArgument(string arg)

@@ -13,6 +13,12 @@ public class WebServerStaticContentSecurityTests
     [InlineData("/secrets/deploy.pem", true)]
     [InlineData("/app/foo.pem", true)]
     [InlineData("/.env", true)]
+    [InlineData("/.env.local", true)]
+    [InlineData("/.env.production", true)]
+    [InlineData("/server.pem.txt", true)]
+    [InlineData("/keystore.jks.old", true)]
+    [InlineData("/server.pem/", true)]
+    [InlineData("/.npmrc", true)]
     [InlineData("/index.html", false)]
     [InlineData("/dotnet.wasm", false)]
     public void ShouldBlockRequestPath_BlocksSensitiveExtensions(string path, bool blocked) =>

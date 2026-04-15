@@ -1,4 +1,4 @@
-﻿// Licensed to the .NET Foundation under one or more agreements.
+// Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 // See the LICENSE file in the project root for more information.
 
@@ -25,7 +25,7 @@ public abstract class AppRunTestBase : IDisposable
     protected const string SimulatorDeviceName = "Test iPhone simulator";
     protected const string DeviceName = "Test iPhone";
 
-    protected static readonly string s_outputPath = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
+    protected static readonly string s_outputPath = Directory.CreateTempSubdirectory("xharness-apple-tests-").FullName;
     protected static readonly string s_appPath = Path.Combine(s_outputPath, AppName);
 
     protected static readonly IHardwareDevice s_mockDevice = Mock.Of<IHardwareDevice>(x =>
@@ -111,7 +111,7 @@ public abstract class AppRunTestBase : IDisposable
             .Setup(x => x.GetLocalIpAddresses())
             .Returns(new[] { IPAddress.Loopback, IPAddress.IPv6Loopback });
 
-        Directory.CreateDirectory(s_outputPath);
+        // s_outputPath is already created (temp subdirectory)
     }
 
     public void Dispose()

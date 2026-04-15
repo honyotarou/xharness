@@ -16,6 +16,11 @@ public static class CliTokenValidator
         ArgumentException.ThrowIfNullOrEmpty(value);
         foreach (char c in value)
         {
+            // Reject isolated UTF-16 surrogates (invalid scalar values) to prevent downstream encoding/logging issues.
+            if (char.IsSurrogate(c))
+            {
+                throw new ArgumentException("The value must not contain invalid Unicode characters.", paramName);
+            }
             if (char.IsControl(c) || c == '\u2028' || c == '\u2029')
             {
                 throw new ArgumentException("The value must not contain control characters.", paramName);

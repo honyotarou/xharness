@@ -165,4 +165,35 @@ public class HostPathSecurityTests
             }
         }
     }
+
+    [Fact]
+    public void OpenNewFileForWriteUnderBase_RejectsSymlinkFinalComponent()
+    {
+        if (OperatingSystem.IsWindows())
+        {
+            return;
+        }
+
+        var root = Path.Combine(Path.GetTempPath(), "xharness-toctou-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        try
+        {
+            var baseDir = Path.Combine(root, "base");
+            Directory.CreateDirectory(baseDir);
+            var outside = Path.Combine(root, "outside");
+            Directory.CreateDirectory(outside);
+
+            var linkPath = Path.Combine(baseDir, "out.txt");
+            File.CreateSymbolicLink(linkPath, Path.Combine(outside, "shadow"));
+
+            Assert.ThrowsAny<Exception>(() =>
+            {
+                using var fs = HostPathSecurity.OpenNewFileForWriteUnderBase(baseDir, linkPath, "p");
+            });
+        }
+        finally
+        {
+            try { Directory.Delete(root, recursive: true); } catch { }
+        }
+    }
 }

@@ -23,6 +23,33 @@ public class IssuedCommandRedactionTests
     }
 
     [Fact]
+    public void FormatArgumentsForLog_RedactsSpaceSeparatedTokenValueForm()
+    {
+        string[] args = { "android", "test", "--auth-token", "SuperSecret123", "--app=/a.apk" };
+        string line = IssuedCommandRedaction.FormatArgumentsForLog(args);
+        Assert.Contains("--auth-token", line);
+        Assert.Contains("[REDACTED]", line);
+        Assert.DoesNotContain("SuperSecret123", line);
+        Assert.Contains("--app=/a.apk", line);
+    }
+
+    [Theory]
+    [InlineData("--private-key=RSA_PRIVATE_KEY_HERE")]
+    [InlineData("--passphrase=MyP@ssphrase")]
+    [InlineData("--connection-string=Server=...;Pwd=...")]
+    [InlineData("--signing-cert=base64data")]
+    public void FormatArgumentsForLog_RedactsAdditionalSensitiveKeyFamilies(string arg)
+    {
+        string[] args = { "cmd", arg };
+        string line = IssuedCommandRedaction.FormatArgumentsForLog(args);
+        Assert.Contains("[REDACTED]", line);
+        Assert.DoesNotContain("RSA_PRIVATE_KEY_HERE", line);
+        Assert.DoesNotContain("MyP@ssphrase", line);
+        Assert.DoesNotContain("Pwd=", line);
+        Assert.DoesNotContain("base64data", line);
+    }
+
+    [Fact]
     public void FormatArgumentsForLog_LeavesBenignFlags()
     {
         string[] args = { "help", "--output-directory=/tmp/out" };

@@ -16,4 +16,11 @@ public class RegexSecurityTests
         var r = RegexSecurity.Create("test", RegexOptions.None);
         Assert.Equal(RegexSecurity.DefaultMatchTimeout, r.MatchTimeout);
     }
+
+    [Fact]
+    public void Create_AllowsNonBacktracking()
+    {
+        var r = RegexSecurity.Create("test", RegexOptions.NonBacktracking);
+        Assert.Equal(RegexOptions.NonBacktracking, r.Options & RegexOptions.NonBacktracking);
+    }
 }

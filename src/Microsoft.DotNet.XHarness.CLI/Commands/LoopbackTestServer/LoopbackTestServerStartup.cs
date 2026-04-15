@@ -90,6 +90,12 @@ internal sealed class LoopbackTestServerStartup
             });
         }
 
+        // CORS must run before static files so static assets also carry the policy headers.
+        if (options.UseCors)
+        {
+            app.UseCors("LocalhostCors");
+        }
+
         if (options.UseDefaultFiles)
         {
             app.UseDefaultFiles(new DefaultFilesOptions
@@ -104,11 +110,6 @@ internal sealed class LoopbackTestServerStartup
             ContentTypeProvider = provider,
             ServeUnknownFileTypes = false
         });
-
-        if (options.UseCors)
-        {
-            app.UseCors("LocalhostCors");
-        }
 
         app.UseWebSockets();
         if (options.OnConsoleConnected != null)
@@ -152,7 +153,7 @@ internal sealed class LoopbackTestServerStartup
 
                     bool withinLimit;
                     long written;
-                    await using (var fileStream = File.Create(xmlResultsFilePath))
+                    await using (var fileStream = HostPathSecurity.OpenNewFileForWriteUnderBase(options.OutputDirectory!, xmlResultsFilePath, nameof(options.OutputDirectory)))
                     {
                         (withinLimit, written) = await WebServerTestResultsUpload.TryCopyStreamToStreamWithLimitAsync(
                             context.Request.Body,

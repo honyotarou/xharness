@@ -46,4 +46,14 @@ public class CliTokenValidatorTests
         Assert.Throws<System.ArgumentNullException>(() => CliTokenValidator.ThrowIfContainsControlCharacters(null, "p"));
         Assert.Throws<ArgumentException>(() => CliTokenValidator.ThrowIfContainsControlCharacters("", "p"));
     }
+
+    [Theory]
+    [InlineData(0xD800)] // isolated high surrogate
+    [InlineData(0xDC00)] // isolated low surrogate
+    public void ThrowIfContainsControlCharacters_RejectsIsolatedSurrogates(int surrogate)
+    {
+        var malicious = "safe" + new string((char)surrogate, 1) + "value";
+        Assert.Throws<ArgumentException>(() =>
+            CliTokenValidator.ThrowIfContainsControlCharacters(malicious, "param"));
+    }
 }

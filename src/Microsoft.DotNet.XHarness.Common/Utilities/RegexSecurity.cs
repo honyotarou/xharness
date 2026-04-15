@@ -15,6 +15,10 @@ public static class RegexSecurity
     /// <summary>Default upper bound for a single <see cref="Regex.Match(string)"/> against long lines.</summary>
     public static readonly TimeSpan DefaultMatchTimeout = TimeSpan.FromSeconds(1);
 
-    public static Regex Create(string pattern, RegexOptions options = RegexOptions.None) =>
-        new Regex(pattern, options | RegexOptions.Compiled, DefaultMatchTimeout);
+    public static Regex Create(string pattern, RegexOptions options = RegexOptions.None)
+    {
+        // Do not force Compiled: it can conflict with NonBacktracking on newer runtimes.
+        // Callers can opt into Compiled explicitly if they want it.
+        return new Regex(pattern, options, DefaultMatchTimeout);
+    }
 }
