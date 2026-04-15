@@ -75,6 +75,15 @@ public class StringUtilsTests
         Assert.Contains(token, joined);
     }
 
+    [Fact]
+    public void FormatArguments_ArgWithDoubleQuote_IsEscapedOnce()
+    {
+        var joined = StringUtils.FormatArguments("a\"b");
+        Assert.Contains("\\\"", joined);
+        // Previous bug produced a backslash followed by multiple quotes (e.g. \\\"\"\")
+        Assert.DoesNotContain("\\\"\"\"", joined);
+    }
+
     [Fact(Skip = "Only works on OSX/Linux")]
     public void FormatArgumentsTest()
     {

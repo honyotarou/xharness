@@ -102,6 +102,30 @@ public class AdbRunnerTests : IDisposable
         Assert.Throws<ArgumentException>(() => runner.PullFiles("pkg", "/sdcard", "/tmp/../out"));
     }
 
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("   ")]
+    public void PullFiles_RejectsEmptyDevicePath(string devicePath)
+    {
+        var runner = new AdbRunner(_mainLog.Object, _processManager.Object, s_adbPath);
+        Assert.ThrowsAny<ArgumentException>(() => runner.PullFiles("pkg", devicePath, s_scratchAndOutputPath));
+    }
+
+    [Theory]
+    [InlineData("/data/local/tmp;id")]
+    [InlineData("/data/local/tmp|id")]
+    [InlineData("/data/local/tmp`id`")]
+    [InlineData("/data/local/tmp$(id)")]
+    [InlineData("/data/local/tmp\"bad\"")]
+    [InlineData("/data/local/tmp'bad'")]
+    [InlineData("-rf /")]
+    public void PullFiles_RejectsUnsafeDevicePath(string devicePath)
+    {
+        var runner = new AdbRunner(_mainLog.Object, _processManager.Object, s_adbPath);
+        Assert.Throws<ArgumentException>(() => runner.PullFiles("pkg", devicePath, s_scratchAndOutputPath));
+    }
+
     [Fact]
     public void DumpBugReport()
     {

@@ -98,7 +98,7 @@ public class StringUtils
             if (c == '"')
             {
                 s.Append('\\');
-                s.Append(c).Append(c);
+                s.Append(c);
             }
             else if (c == '\\')
             {

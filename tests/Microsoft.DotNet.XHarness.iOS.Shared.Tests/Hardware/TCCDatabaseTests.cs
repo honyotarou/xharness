@@ -1,4 +1,4 @@
-﻿// Licensed to the .NET Foundation under one or more agreements.
+// Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 // See the LICENSE file in the project root for more information.
 
@@ -18,6 +18,7 @@ namespace Microsoft.DotNet.XHarness.iOS.Shared.Tests.Hardware;
 
 public class TCCDatabaseTests
 {
+    private static string EscapeSqlStringLiteral(string value) => value.Replace("'", "''", StringComparison.Ordinal);
     private readonly Mock<IMlaunchProcessManager> _processManager;
     private readonly TCCDatabase _database;
     private readonly Mock<ILog> _executionLog;
@@ -102,26 +103,30 @@ public class TCCDatabaseTests
         // assert the sql used depending on the version
         foreach (var id in new[] { bundleIdentifier, bundleIdentifier + ".watchkitapp" })
         {
+            string safeId = EscapeSqlStringLiteral(id);
             switch (dbVersion)
             {
                 case 1:
                     foreach (var s in services)
                     {
-                        expectedArgs.AppendFormat("DELETE FROM access WHERE service = '{0}' AND client = '{1}';\n", s, id);
-                        expectedArgs.AppendFormat("INSERT INTO access VALUES('{0}','{1}',0,1,0,NULL);\n", s, id);
+                        string safeService = EscapeSqlStringLiteral(s);
+                        expectedArgs.AppendFormat("DELETE FROM access WHERE service = '{0}' AND client = '{1}';\n", safeService, safeId);
+                        expectedArgs.AppendFormat("INSERT INTO access VALUES('{0}','{1}',0,1,0,NULL);\n", safeService, safeId);
                     }
                     break;
                 case 2:
                     foreach (var s in services)
                     {
-                        expectedArgs.AppendFormat("DELETE FROM access WHERE service = '{0}' AND client = '{1}';\n", s, id);
-                        expectedArgs.AppendFormat("INSERT INTO access VALUES('{0}','{1}',0,1,0,NULL,NULL);\n", s, id);
+                        string safeService = EscapeSqlStringLiteral(s);
+                        expectedArgs.AppendFormat("DELETE FROM access WHERE service = '{0}' AND client = '{1}';\n", safeService, safeId);
+                        expectedArgs.AppendFormat("INSERT INTO access VALUES('{0}','{1}',0,1,0,NULL,NULL);\n", safeService, safeId);
                     }
                     break;
                 case 3:
                     foreach (var s in services)
                     {
-                        expectedArgs.AppendFormat("INSERT OR REPLACE INTO access VALUES('{0}','{1}',0,1,0,NULL,NULL,NULL,'UNUSED',NULL,NULL,{2});\n", s, id, DateTimeOffset.Now.ToUnixTimeSeconds());
+                        string safeService = EscapeSqlStringLiteral(s);
+                        expectedArgs.AppendFormat("INSERT OR REPLACE INTO access VALUES('{0}','{1}',0,1,0,NULL,NULL,NULL,'UNUSED',NULL,NULL,{2});\n", safeService, safeId, DateTimeOffset.Now.ToUnixTimeSeconds());
                     }
                     break;
             }

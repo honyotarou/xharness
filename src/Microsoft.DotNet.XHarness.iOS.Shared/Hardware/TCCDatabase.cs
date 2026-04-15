@@ -1,4 +1,4 @@
-﻿// Licensed to the .NET Foundation under one or more agreements.
+// Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 // See the LICENSE file in the project root for more information.
 
@@ -193,23 +193,25 @@ public class TCCDatabase : ITCCDatabase
                     args.Add(TCCDb);
                     foreach (var bundle_id in new[] { bundle_identifier, bundle_identifier + ".watchkitapp" })
                     {
+                        var safeBundleId = EscapeSqlStringLiteral(bundle_id);
                         foreach (var service in sim_services)
                         {
+                            var safeService = EscapeSqlStringLiteral(service);
                             switch (format)
                             {
                                 case 1:
                                     // CREATE TABLE access (service TEXT NOT NULL, client TEXT NOT NULL, client_type INTEGER NOT NULL, allowed INTEGER NOT NULL, prompt_count INTEGER NOT NULL, csreq BLOB, CONSTRAINT key PRIMARY KEY (service, client, client_type));
-                                    sql.AppendFormat("DELETE FROM access WHERE service = '{0}' AND client = '{1}';\n", service, bundle_id);
-                                    sql.AppendFormat("INSERT INTO access VALUES('{0}','{1}',0,1,0,NULL);\n", service, bundle_id);
+                                    sql.AppendFormat("DELETE FROM access WHERE service = '{0}' AND client = '{1}';\n", safeService, safeBundleId);
+                                    sql.AppendFormat("INSERT INTO access VALUES('{0}','{1}',0,1,0,NULL);\n", safeService, safeBundleId);
                                     break;
                                 case 2:
                                     // CREATE TABLE access (service	TEXT NOT NULL, client TEXT NOT NULL, client_type INTEGER NOT NULL, allowed INTEGER NOT NULL, prompt_count INTEGER NOT NULL, csreq BLOB, policy_id INTEGER, PRIMARY KEY (service, client, client_type), FOREIGN KEY (policy_id) REFERENCES policies(id) ON DELETE CASCADE ON UPDATE CASCADE);
-                                    sql.AppendFormat("DELETE FROM access WHERE service = '{0}' AND client = '{1}';\n", service, bundle_id);
-                                    sql.AppendFormat("INSERT INTO access VALUES('{0}','{1}',0,1,0,NULL,NULL);\n", service, bundle_id);
+                                    sql.AppendFormat("DELETE FROM access WHERE service = '{0}' AND client = '{1}';\n", safeService, safeBundleId);
+                                    sql.AppendFormat("INSERT INTO access VALUES('{0}','{1}',0,1,0,NULL,NULL);\n", safeService, safeBundleId);
                                     break;
                                 case 3: // Xcode 10+
                                         // CREATE TABLE access (service TEXT NOT NULL, client TEXT NOT NULL, client_type INTEGER NOT NULL, allowed INTEGER NOT NULL, prompt_count INTEGER NOT NULL, csreq BLOB, policy_id INTEGER, indirect_object_identifier_type INTEGER, indirect_object_identifier TEXT, indirect_object_code_identity BLOB, flags INTEGER, last_modified  INTEGER NOT NULL DEFAULT (CAST(strftime('%s','now') AS INTEGER)), PRIMARY KEY (service, client, client_type, indirect_object_identifier), FOREIGN KEY (policy_id) REFERENCES policies(id) ON DELETE CASCADE ON UPDATE CASCADE)
-                                    sql.AppendFormat("INSERT OR REPLACE INTO access VALUES('{0}','{1}',0,1,0,NULL,NULL,NULL,'UNUSED',NULL,NULL,{2});\n", service, bundle_id, DateTimeOffset.Now.ToUnixTimeSeconds());
+                                    sql.AppendFormat("INSERT OR REPLACE INTO access VALUES('{0}','{1}',0,1,0,NULL,NULL,NULL,'UNUSED',NULL,NULL,{2});\n", safeService, safeBundleId, DateTimeOffset.Now.ToUnixTimeSeconds());
                                     break;
                                 default:
                                     throw new NotImplementedException();
@@ -242,5 +244,11 @@ public class TCCDatabase : ITCCDatabase
         await _processManager.ExecuteCommandAsync("sqlite3", new[] { TCCDb, ".dump" }, log, TimeSpan.FromSeconds(5));
 
         return !failure;
+    }
+
+    private static string EscapeSqlStringLiteral(string value)
+    {
+        // For sqlite3 CLI we pass SQL as text; escape single quotes to prevent injection.
+        return value.Replace("'", "''", StringComparison.Ordinal);
     }
 }

@@ -856,6 +856,18 @@ public class AdbRunner
         }
 
         HostPathSecurity.ThrowIfUnsafeHostPath(localPath, nameof(localPath));
+        if (string.IsNullOrWhiteSpace(devicePath))
+        {
+            throw new ArgumentNullException(nameof(devicePath));
+        }
+        // Defense-in-depth: devicePath can reach `adb shell run-as ... ls/cp <devicePath>` on API 30 fallback.
+        // Keep it strict to avoid on-device sh metacharacter injection.
+        if (devicePath.Length > 1024 ||
+            devicePath.StartsWith("-", StringComparison.Ordinal) ||
+            devicePath.IndexOfAny(new[] { ';', '&', '|', '<', '>', '`', '$', '\n', '\r', '\t', '\\', '"', '\'' }) >= 0)
+        {
+            throw new ArgumentException("Unsafe device path.", nameof(devicePath));
+        }
         string tempFolder = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
         try
         {
