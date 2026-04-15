@@ -35,13 +35,12 @@ public class Helpers : IHelpers
     // annoying when XS reloads the projects, and also causes unnecessary rebuilds).
     // Nothing really breaks when the sequence isn't identical from run to run, so
     // this is just a best minimal effort.
-    private static readonly ThreadLocal<Random> s_guidGenerator = new(() => new Random(unchecked((int)0xdeadf00d)));
     public Guid GenerateStableGuid(string seed = null)
     {
         var bytes = new byte[16];
         if (seed == null)
         {
-            s_guidGenerator.Value!.NextBytes(bytes);
+            RandomNumberGenerator.Fill(bytes);
         }
         else
         {

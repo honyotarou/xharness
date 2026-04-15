@@ -37,26 +37,17 @@ public class SimpleHttpListener : SimpleListener
             throw new NotImplementedException();
         }
 
-        // Try and find an unused port
-        int attemptsLeft = 50;
-        var r = new Random((int)DateTime.Now.Ticks);
+        // Bind to an OS-assigned ephemeral port to avoid predictable selection / port hijacking races.
         string prefixHost = TcpListenerAddressResolver.GetHttpListenerPrefixHost();
-        while (attemptsLeft-- > 0)
-        {
-            var newPort = r.Next(49152, 65535); // The suggested range for dynamic ports is 49152-65535 (IANA)
-            _server.Prefixes.Clear();
-            _server.Prefixes.Add("http://" + prefixHost + ":" + newPort + "/");
-            try
-            {
-                _server.Start();
-                Port = newPort;
-                break;
-            }
-            catch (Exception ex)
-            {
-                Log.WriteLine("Failed to listen on port {0}: {1}", newPort, ex.Message);
-            }
-        }
+        using var tcp = new TcpListener(IPAddress.Loopback, 0);
+        tcp.Start();
+        var newPort = ((IPEndPoint)tcp.LocalEndpoint).Port;
+        tcp.Stop();
+
+        _server.Prefixes.Clear();
+        _server.Prefixes.Add("http://" + prefixHost + ":" + newPort + "/");
+        _server.Start();
+        Port = newPort;
 
         return Port;
     }

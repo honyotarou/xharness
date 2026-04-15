@@ -117,4 +117,19 @@ public class PListExtensionsTests
         doc.SetPListStringValue("O'Reilly", "books");
         Assert.True(doc.ContainsKey("O'Reilly"));
     }
+
+    [Fact]
+    public void AddPListKeyValuePair_DoesNotInterpretValueAsXmlMarkup()
+    {
+        var doc = new XmlDocument();
+        doc.LoadXml("<?xml version=\"1.0\" encoding=\"UTF-8\"?><plist version=\"1.0\"><dict></dict></plist>");
+
+        doc.AddPListKeyValuePair("k", "string", "<injected/>");
+
+        var node = doc.SelectSingleNode("//dict/key[text()='k']")?.NextSibling;
+        Assert.NotNull(node);
+        Assert.Equal("string", node!.Name);
+        Assert.Equal("<injected/>", node.InnerText);
+        Assert.Null(doc.SelectSingleNode("//injected"));
+    }
 }

@@ -19,6 +19,7 @@ public interface IDeviceLogCapturer : IDisposable
 
 public class DeviceLogCapturer : IDeviceLogCapturer
 {
+    private const string AllowSudoLogCollectEnv = "XHARNESS_ALLOW_SUDO_LOG_COLLECT";
     private readonly ILog _mainLog;
     private readonly ILog _deviceLog;
     private readonly string _deviceUdid;
@@ -55,6 +56,17 @@ public class DeviceLogCapturer : IDeviceLogCapturer
         // Collect logs. Use a timeout to avoid hanging indefinitely if the device
         // becomes unresponsive (e.g. tvOS devices with broken log streaming).
         const int processTimeoutMs = 120_000; // 2 minutes
+
+        bool allowSudo =
+            string.Equals(Environment.GetEnvironmentVariable(AllowSudoLogCollectEnv)?.Trim(), "1", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(Environment.GetEnvironmentVariable(AllowSudoLogCollectEnv)?.Trim(), "true", StringComparison.OrdinalIgnoreCase);
+
+        if (!allowSudo)
+        {
+            _mainLog.WriteLine($"Skipping device log collection because it requires sudo. Set {AllowSudoLogCollectEnv}=1 to enable.");
+            CleanupOutputPath();
+            return;
+        }
 
         _deviceLog.WriteLine($"Collecting logs: sudo log collect --device-udid <udid> --start \"{startTimeStr}\" --output \"{_outputPath}\"");
 

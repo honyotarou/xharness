@@ -872,7 +872,10 @@ public class AdbRunner
         {
             throw new ArgumentException("Unsafe device path.", nameof(devicePath));
         }
-        string tempFolder = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
+        // Use a user-private temp root instead of shared /tmp (attacker: multi-user host reads/writes temp).
+        string privateTempRoot = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "xharness", "tmp");
+        Directory.CreateDirectory(privateTempRoot);
+        string tempFolder = Path.Combine(privateTempRoot, Path.GetRandomFileName());
         try
         {
             Directory.CreateDirectory(tempFolder);

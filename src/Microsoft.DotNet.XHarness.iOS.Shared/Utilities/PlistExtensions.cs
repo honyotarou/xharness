@@ -53,7 +53,8 @@ public static class PListExtensions
             var settings = new XmlReaderSettings
             {
                 XmlResolver = null,
-                DtdProcessing = DtdProcessing.Parse,
+                // XML strings are not expected to include plist DTD; prohibit DTD to reduce attack surface.
+                DtdProcessing = DtdProcessing.Prohibit,
                 MaxCharactersFromEntities = SecureXmlReaderSettings.DefaultMaxCharactersFromEntities,
             };
             using (var reader = XmlReader.Create(fs, settings))
@@ -147,7 +148,8 @@ public static class PListExtensions
         var keyElement = plist.CreateElement("key");
         keyElement.InnerText = node;
         var valueElement = plist.CreateElement(valueType);
-        valueElement.InnerXml = value;
+        // Treat input as data, not markup (attacker: plist value injection).
+        valueElement.InnerText = value;
         var root = plist.SelectSingleNode("//dict");
         root.AppendChild(keyElement);
         root.AppendChild(valueElement);
