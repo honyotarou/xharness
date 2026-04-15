@@ -44,6 +44,9 @@ internal static class LocalhostStatefulEndpointGate
         return null;
     }
 
+    public static string? GetStatefulSessionCookie(HttpRequest request) =>
+        request.Cookies.TryGetValue(WebServerStatefulSession.CookieName, out var value) ? value : null;
+
     public static string? GetWebSocketSessionQuery(HttpRequest request) =>
         request.Query.TryGetValue(WebServerStatefulSession.QueryParameterName, out var q) && q.Count > 0 ? q[0] : null;
 
@@ -53,6 +56,7 @@ internal static class LocalhostStatefulEndpointGate
             HasConflictingStatefulSessionHeaders(request),
             GetOriginHeader(request),
             GetStatefulSessionHeader(request),
+            GetStatefulSessionCookie(request),
             statefulSessionToken);
 
     public static bool IsWebSocketRequestAllowed(HttpRequest request, string? statefulSessionToken) =>

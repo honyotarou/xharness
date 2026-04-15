@@ -27,6 +27,7 @@ internal class WasmTestBrowserCommandArguments : XHarnessCommandArguments, IWebS
     public BackgroundThrottlingArgument BackgroundThrottling { get; } = new();
     public LocaleArgument Locale { get; } = new("en-US");
     public PageLoadStrategyArgument PageLoadStrategy { get; } = new(OpenQA.Selenium.PageLoadStrategy.Normal);
+    public AllowNoSandboxInContainerArgument AllowNoSandboxInContainer { get; } = new();
 
     public SymbolMapFileArgument SymbolMapFileArgument { get; } = new();
     public SymbolicatePatternsFileArgument SymbolicatePatternsFileArgument { get; } = new();
@@ -59,6 +60,7 @@ internal class WasmTestBrowserCommandArguments : XHarnessCommandArguments, IWebS
             BackgroundThrottling,
             Locale,
             PageLoadStrategy,
+            AllowNoSandboxInContainer,
             SymbolMapFileArgument,
             SymbolicatePatternsFileArgument,
             SymbolicatorArgument,
@@ -91,6 +93,32 @@ internal class WasmTestBrowserCommandArguments : XHarnessCommandArguments, IWebS
         if (DebuggerPort.Value != null || NoQuit)
         {
             NoHeadless.Set(true);
+        }
+
+        ValidateBrowserArgs(BrowserArgs.Value);
+    }
+
+    internal static void ValidateBrowserArgs(System.Collections.Generic.IEnumerable<string> args)
+    {
+        foreach (var arg in args)
+        {
+            if (string.IsNullOrWhiteSpace(arg))
+            {
+                continue;
+            }
+
+            // Block flags that materially weaken the browser sandbox / SOP and enable host file exfiltration.
+            // (attacker: supply-chain / CI argument injection via --browser-arg)
+            var a = arg.Trim();
+            if (a.StartsWith("--disable-web-security", StringComparison.OrdinalIgnoreCase) ||
+                a.StartsWith("--allow-file-access-from-files", StringComparison.OrdinalIgnoreCase) ||
+                a.StartsWith("--allow-file-access", StringComparison.OrdinalIgnoreCase) ||
+                a.StartsWith("--disable-site-isolation-trials", StringComparison.OrdinalIgnoreCase) ||
+                a.StartsWith("--user-data-dir", StringComparison.OrdinalIgnoreCase) ||
+                a.StartsWith("--unsafely-treat-insecure-origin-as-secure", StringComparison.OrdinalIgnoreCase))
+            {
+                throw new ArgumentException($"Rejected dangerous --browser-arg: '{arg}'");
+            }
         }
     }
 }

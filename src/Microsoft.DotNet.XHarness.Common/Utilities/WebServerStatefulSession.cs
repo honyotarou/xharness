@@ -21,6 +21,8 @@ public static class WebServerStatefulSession
 
     public const string EnvironmentVariableName = "XHARNESS_STATEFUL_SESSION";
 
+    public const string CookieName = "xharness_stateful_session";
+
     /// <summary>32-byte token, Base64Url-encoded (no padding).</summary>
     public static string GenerateToken()
     {

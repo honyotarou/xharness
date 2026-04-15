@@ -126,6 +126,27 @@ public class AdbRunnerTests : IDisposable
         Assert.Throws<ArgumentException>(() => runner.PullFiles("pkg", devicePath, s_scratchAndOutputPath));
     }
 
+    [Theory]
+    [InlineData("/data/local/tmp;id")]
+    [InlineData("/data/local/tmp|id")]
+    [InlineData("-rf /")]
+    public void HeadlessPullFiles_RejectsUnsafeDevicePath(string devicePath)
+    {
+        var runner = new AdbRunner(_mainLog.Object, _processManager.Object, s_adbPath);
+        Assert.Throws<ArgumentException>(() => runner.HeadlessPullFiles(devicePath, s_scratchAndOutputPath));
+    }
+
+    [Theory]
+    [InlineData("run.sh;id")]
+    [InlineData("run.sh|id")]
+    [InlineData("run bad.sh")]
+    [InlineData("-rf")]
+    public void RunHeadlessCommand_RejectsUnsafeScriptName(string testScript)
+    {
+        var runner = new AdbRunner(_mainLog.Object, _processManager.Object, s_adbPath);
+        Assert.Throws<ArgumentException>(() => runner.RunHeadlessCommand("tests", "runtime", "assembly.dll", testScript, TimeSpan.FromSeconds(1)));
+    }
+
     [Fact]
     public void DumpBugReport()
     {

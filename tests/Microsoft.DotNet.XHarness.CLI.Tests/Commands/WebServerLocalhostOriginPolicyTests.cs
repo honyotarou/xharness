@@ -77,6 +77,14 @@ public class WebServerLocalhostOriginPolicyTests
     }
 
     [Fact]
+    public void IsHttpRequestAllowed_NoOriginAllowsCookieSession()
+    {
+        var noOrigin = new DefaultHttpContext();
+        noOrigin.Request.Headers.Cookie = $"{WebServerStatefulSession.CookieName}=tok";
+        Assert.True(LocalhostStatefulEndpointGate.IsHttpRequestAllowed(noOrigin.Request, "tok"));
+    }
+
+    [Fact]
     public void IsHttpRequestAllowed_RejectsEvilOrDuplicateOrigin()
     {
         var evil = new DefaultHttpContext();

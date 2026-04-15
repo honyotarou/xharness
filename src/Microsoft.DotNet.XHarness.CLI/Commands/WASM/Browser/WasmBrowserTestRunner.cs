@@ -18,7 +18,6 @@ using Microsoft.DotNet.XHarness.Common.CLI;
 using Microsoft.DotNet.XHarness.Common.Utilities;
 using Microsoft.Extensions.Logging;
 using OpenQA.Selenium;
-using OpenQA.Selenium.DevTools;
 using OpenQA.Selenium.Support.UI;
 
 using LogLevel = Microsoft.Extensions.Logging.LogLevel;
@@ -71,22 +70,7 @@ internal class WasmBrowserTestRunner
 
             string testUrl = BuildUrl(serverURLs);
 
-            var devTools = driver as IDevTools;
-            // firefox does not support devtools protocol, we use websocket to push console logs from Firefox
-            if (devTools != null)
-            {
-                var session = devTools.CreateDevToolsSession();
-                await session.Console.Enable();
-                session.Console.MessageAdded += Console_MessageAdded;
-
-                void Console_MessageAdded(object? sender, OpenQA.Selenium.DevTools.Console.MessageAddedEventArgs e)
-                {
-                    var text = e.Message.Text;
-                    var match = s_consoleLogRegex.Match(Regex.Unescape(text));
-                    string msg = match.Success ? match.Groups[1].Value : text;
-                    _messagesProcessor.Invoke(msg);
-                }
-            }
+            // Console output is forwarded by the test page to the loopback server (/console websocket).
 
             cts.CancelAfter(_arguments.Timeout);
 
@@ -264,15 +248,8 @@ internal class WasmBrowserTestRunner
             }
         }
 
-        if (!string.IsNullOrEmpty(serverURLs.StatefulSessionToken))
-        {
-            if (sb.Length > 0)
-            {
-                sb.Append('&');
-            }
-
-            sb.Append($"arg={HttpUtility.UrlEncode($"--setenv={WebServerStatefulSession.EnvironmentVariableName}={serverURLs.StatefulSessionToken}")}");
-        }
+        // Do not pass the stateful session token via the URL query (would be visible to the page).
+        // Browser clients receive it as an HttpOnly cookie from the loopback server.
 
         foreach (var arg in _passThroughArguments)
         {

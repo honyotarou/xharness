@@ -21,6 +21,7 @@ public class WebServerStatefulEndpointPolicyTests
             hasConflictingStatefulSessionHeaders: false,
             originHeader: "http://127.0.0.1:55",
             sessionHeaderValue: null,
+            sessionCookieValue: null,
             expectedSessionToken: Token));
 
     [Fact]
@@ -28,6 +29,7 @@ public class WebServerStatefulEndpointPolicyTests
         Assert.False(WebServerStatefulEndpointPolicy.IsHttpRequestAllowed(
             false,
             false,
+            null,
             null,
             null,
             Token));
@@ -39,6 +41,7 @@ public class WebServerStatefulEndpointPolicyTests
             false,
             null,
             Token,
+            null,
             Token));
 
     [Fact]
@@ -47,6 +50,7 @@ public class WebServerStatefulEndpointPolicyTests
             false,
             false,
             "null",
+            null,
             null,
             Token));
 
@@ -57,6 +61,7 @@ public class WebServerStatefulEndpointPolicyTests
             false,
             "http://127.0.0.1:1",
             Token,
+            null,
             Token));
 
     [Fact]
@@ -66,6 +71,7 @@ public class WebServerStatefulEndpointPolicyTests
             true,
             null,
             Token,
+            null,
             Token));
 
     [Fact]

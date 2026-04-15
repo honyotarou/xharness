@@ -111,6 +111,26 @@ internal sealed class LoopbackTestServerStartup
             ServeUnknownFileTypes = false
         });
 
+        if (!string.IsNullOrEmpty(options.StatefulSessionToken))
+        {
+            // Avoid leaking the token via query params; bind it to an HttpOnly cookie for browser clients.
+            app.Use((context, next) =>
+            {
+                context.Response.Cookies.Append(
+                    WebServerStatefulSession.CookieName,
+                    options.StatefulSessionToken!,
+                    new CookieOptions
+                    {
+                        HttpOnly = true,
+                        IsEssential = true,
+                        SameSite = SameSiteMode.Strict,
+                        Secure = options.UseHttps,
+                        Path = "/",
+                    });
+                return next();
+            });
+        }
+
         app.UseWebSockets();
         if (options.OnConsoleConnected != null)
         {

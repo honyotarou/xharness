@@ -17,6 +17,7 @@ public static class WebServerStatefulEndpointPolicy
         bool hasConflictingStatefulSessionHeaders,
         string? originHeader,
         string? sessionHeaderValue,
+        string? sessionCookieValue,
         string? expectedSessionToken)
     {
         if (hasConflictingOriginHeaders || hasConflictingStatefulSessionHeaders)
@@ -34,7 +35,8 @@ public static class WebServerStatefulEndpointPolicy
             return false;
         }
 
-        return WebServerStatefulSession.FixedTimeEquals(sessionHeaderValue, expectedSessionToken);
+        return WebServerStatefulSession.FixedTimeEquals(sessionHeaderValue, expectedSessionToken)
+            || WebServerStatefulSession.FixedTimeEquals(sessionCookieValue, expectedSessionToken);
     }
 
     /// <summary>

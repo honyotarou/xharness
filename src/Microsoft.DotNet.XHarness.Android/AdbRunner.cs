@@ -951,6 +951,19 @@ public class AdbRunner
             throw new ArgumentNullException(nameof(localPath));
         }
 
+        HostPathSecurity.ThrowIfUnsafeHostPath(localPath, nameof(localPath));
+        if (string.IsNullOrWhiteSpace(devicePath))
+        {
+            throw new ArgumentNullException(nameof(devicePath));
+        }
+        // Defense-in-depth: devicePath reaches `adb pull <devicePath> ...` and must not contain shell metacharacters.
+        if (devicePath.Length > 1024 ||
+            devicePath.StartsWith("-", StringComparison.Ordinal) ||
+            devicePath.IndexOfAny(new[] { ';', '&', '|', '<', '>', '`', '$', '\n', '\r', '\t', '\\', '"', '\'' }) >= 0)
+        {
+            throw new ArgumentException("Unsafe device path.", nameof(devicePath));
+        }
+
         Directory.CreateDirectory(localPath);
         _log.LogInformation($"Attempting to pull contents of {devicePath} to {localPath}");
 
@@ -960,7 +973,7 @@ public class AdbRunner
         {
             _log.LogError($"Failed to pull file.");
         }
-        return (int)AdbExitCodes.SUCCESS;
+        return result.ExitCode;
     }
 
     /// <summary>
@@ -1365,6 +1378,22 @@ public class AdbRunner
 
     public ProcessExecutionResults RunHeadlessCommand(string testPath, string runtimePath, string testAssembly, string testScript, TimeSpan timeout)
     {
+        if (string.IsNullOrWhiteSpace(testPath))
+        {
+            throw new ArgumentNullException(nameof(testPath));
+        }
+        if (string.IsNullOrWhiteSpace(testScript))
+        {
+            throw new ArgumentNullException(nameof(testScript));
+        }
+        // Defense-in-depth: testScript becomes part of an `adb shell <path>` invocation. Keep it strict.
+        if (testScript.Length > 255 ||
+            testScript.StartsWith("-", StringComparison.Ordinal) ||
+            testScript.IndexOfAny(new[] { ';', '&', '|', '<', '>', '`', '$', '\n', '\r', '\t', '\\', '"', '\'', ' ' }) >= 0)
+        {
+            throw new ArgumentException("Unsafe headless script name.", nameof(testScript));
+        }
+
         var deviceTestPath = GlobalReadWriteDirectory + Path.AltDirectorySeparatorChar + new DirectoryInfo(testPath).Name + Path.AltDirectorySeparatorChar + testScript;
         var deviceRuntimePath = GlobalReadWriteDirectory + Path.AltDirectorySeparatorChar + "runtime" + Path.AltDirectorySeparatorChar + "dotnet";
         var adbArgs = new List<string>
