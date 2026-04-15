@@ -2,6 +2,24 @@
 
 親メニューは [SKILL.md](SKILL.md) の **Step 2**（**0・1 の直後**）。このファイルは **決定論ゲート**・**テスト階層**の正本。
 
+## pre / post（lineskill 互換）
+
+### pre（入口条件）
+
+- `XHarness.slnx` が開ける
+- 変更後に **何を緑にすればマージ相当か**が決まっている（下の「決定論的ゲート」）
+
+### post（出口条件）
+
+- **`pnpm harness` が緑**（= `check:encapsulation` + `dotnet build` + `dotnet test`）
+- CI のゲート定義（Azure Pipelines）と矛盾していない
+
+## CI（正本）
+
+- 公開 CI: [`azure-pipelines-public.yml`](../../../azure-pipelines-public.yml)
+- 内部/公式: [`azure-pipelines.yml`](../../../azure-pipelines.yml)
+- 重要ゲート: [`eng/check-encapsulation.yml`](../../../eng/check-encapsulation.yml)（**dotnet build より前に**カプセル化）
+
 このリポジトリでは **モデルやプロンプトより、リポジトリ内の実行可能なハーネス**（ビルド・テスト・CI）が品質の主担当である。考え方の背景は [Harness Engineering ベストプラクティス（逆瀬川ちゃん, 2026）](https://nyosegawa.com/posts/harness-engineering-best-practices-2026/)（[「ハーネスがモデルより重要」](https://nyosegawa.com/posts/harness-engineering-best-practices-2026/#%E3%83%8F%E3%83%BC%E3%83%8D%E3%82%B9%E3%81%8C%E3%83%A2%E3%83%87%E3%83%AB%E3%82%88%E3%82%8A%E9%87%8D%E8%A6%81) ほか）に沿う。
 
 ## 記事の論点 → このリポの実装

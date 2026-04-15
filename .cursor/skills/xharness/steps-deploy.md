@@ -2,6 +2,19 @@
 
 親メニューは [SKILL.md](SKILL.md) の **Step 12**。**dotnet エコシステム向けの公開**と **上流への寄稿**の心がけ。
 
+## pre / post（lineskill 互換）
+
+### pre（入口条件）
+
+- `pnpm harness:ci`（または同等）が緑（[steps-4-8-gates.md](steps-4-8-gates.md) の `check`）
+- 破壊的変更の有無・バージョン方針が決まっている
+
+### post（出口条件）
+
+- CI の成果物/公開フローが成功し、README の install 手順と矛盾しない
+  - 公開 CI の正本: [`azure-pipelines-public.yml`](../../../azure-pipelines-public.yml)
+  - 内部/公式の正本: [`azure-pipelines.yml`](../../../azure-pipelines.yml)
+
 ## Cursor / エージェントで進めるとき
 
 - **Step 12** を選ばれたら、下記を **順に**進める（秘密をチャットに貼らせない）。

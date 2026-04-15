@@ -4,6 +4,23 @@
 
 ---
 
+## pre / post（lineskill 互換）
+
+### pre（入口条件）
+
+- Step 3〜6 が完了している（[steps-0-3-red-green-refactor.md](steps-0-3-red-green-refactor.md)）
+
+### post（出口条件）
+
+- **Step 7 の `pnpm harness` が緑**
+- 必要なら Step 9（統合/Helix）まで緑
+- `check` を選んだ場合は **`pnpm harness:ci` が緑**
+
+## CI（正本）
+
+- 公開 CI: [`azure-pipelines-public.yml`](../../../azure-pipelines-public.yml)
+- 内部/公式: [`azure-pipelines.yml`](../../../azure-pipelines.yml)
+
 ## Step 7 — 層別ゲート（ローカル harness）
 
 **目的**: ローカルで決定論的に「マージ相当」を証明する（**pentest の各ラウンド末もここ**）。

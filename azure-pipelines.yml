@@ -12,6 +12,12 @@ trigger:
     - internal/release/*
 
 pr: none
+pr:
+  branches:
+    include:
+    - main
+    - release/*
+    - internal/release/*
 
 # Scheduled trigger - runs once per week on Sunday at midnight UTC
 schedules:
