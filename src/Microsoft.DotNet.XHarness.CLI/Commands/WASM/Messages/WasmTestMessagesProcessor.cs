@@ -208,6 +208,7 @@ public class WasmTestMessagesProcessor
         }
 
         line = line.TrimEnd();
+        line = LogInjectionSecurity.Sanitize(line);
 
         var match = XmlResultLineRegex.Match(line);
         if (match.Success)

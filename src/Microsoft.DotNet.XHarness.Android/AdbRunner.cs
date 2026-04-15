@@ -240,7 +240,11 @@ public class AdbRunner
             throw new Exception("Failed to get device's API version");
         }
 
-        var apiVersion = int.Parse(output);
+        if (!int.TryParse(output, out var apiVersion))
+        {
+            _log.LogError($"Failed to parse device API version from output: '{output}'");
+            return -1;
+        }
 
         if (_activeDevice != null)
         {
@@ -1269,7 +1273,14 @@ public class AdbRunner
                         break;
 
                     case AdbProperty.ApiVersion:
-                        device.ApiVersion = value == null ? null : int.Parse(value);
+                        if (value != null && int.TryParse(value, out var parsed))
+                        {
+                            device.ApiVersion = parsed;
+                        }
+                        else
+                        {
+                            device.ApiVersion = null;
+                        }
                         break;
 
                     case AdbProperty.SupportedArchitectures:

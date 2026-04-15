@@ -222,6 +222,10 @@ public class SimpleTcpListener : SimpleListener, ITunnelListener
         // now simply copy what we receive
         int i;
         int total = 0;
+        if (client.ReceiveTimeout == 0)
+        {
+            client.ReceiveTimeout = 120_000;
+        }
         NetworkStream stream = client.GetStream();
         while ((i = stream.Read(_buffer, 0, _buffer.Length)) != 0)
         {

@@ -63,6 +63,13 @@ public class TCCDatabaseTests
     }
 
     [Fact]
+    public async Task AgreeToPromptsAsync_RejectsHostTccDbPaths()
+    {
+        await Assert.ThrowsAsync<ArgumentException>(() =>
+            _database.AgreeToPromptsAsync(_simRuntime, "/Library/Application Support/com.apple.TCC/TCC.db", _udid, _executionLog.Object, "my-bundle"));
+    }
+
+    [Fact]
     public async Task AgreeToPropmtsAsyncTimeoutsTest()
     {
         string processName = null;

@@ -7,6 +7,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Threading.Tasks;
 using Microsoft.DotNet.XHarness.Common.Logging;
+using Microsoft.DotNet.XHarness.Common.Utilities;
 using Microsoft.DotNet.XHarness.iOS.Shared.Execution;
 
 namespace Microsoft.DotNet.XHarness.iOS.Shared.Hardware;
@@ -83,6 +84,14 @@ public class TCCDatabase : ITCCDatabase
 
     public async Task<bool> AgreeToPromptsAsync(string simRuntime, string TCCDb, string udid, ILog log, params string[] bundleIdentifiers)
     {
+        HostPathSecurity.ThrowIfUnsafeHostPath(TCCDb, nameof(TCCDb));
+
+        // Defense-in-depth: refuse known host TCC.db locations (attacker: SIP disabled + compromised DataPath).
+        if (TCCDb.EndsWith("/Library/Application Support/com.apple.TCC/TCC.db", StringComparison.Ordinal))
+        {
+            throw new ArgumentException("Refusing to operate on host TCC.db path.", nameof(TCCDb));
+        }
+
         if (bundleIdentifiers == null || bundleIdentifiers.Length == 0)
         {
             log.WriteLine("No bundle identifiers given when requested permission editing.");

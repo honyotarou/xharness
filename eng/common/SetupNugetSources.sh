@@ -190,7 +190,9 @@ if [ "$CredToken" ]; then
             PackageSourceCredentialsNodeFooter="</packageSourceCredentials>"
             NewCredential="${TB}${TB}<$FeedName>${NL}${TB}<add key=\"Username\" value=\"dn-bot\" />${NL}${TB}${TB}<add key=\"ClearTextPassword\" value=\"$CredToken\" />${NL}${TB}${TB}</$FeedName>"
 
-            sed -i.bak "s|$PackageSourceCredentialsNodeFooter|$NewCredential${NL}$PackageSourceCredentialsNodeFooter|" $ConfigFile
+            # Escape replacement to avoid delimiter collisions (&, \, |) with sed.
+            EscapedNewCredential="$(printf '%s' "$NewCredential" | sed -e 's/[\\&|]/\\&/g')"
+            sed -i.bak "s|$PackageSourceCredentialsNodeFooter|$EscapedNewCredential${NL}$PackageSourceCredentialsNodeFooter|" "$ConfigFile"
         fi
     done
 fi

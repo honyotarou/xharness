@@ -247,8 +247,15 @@ public class InstrumentationRunner
                     {
                         if (int.TryParse(existing, out var existingCode) && int.TryParse(value, out var newCode))
                         {
-                            // Prefer a non-zero (failure) if either indicates failure.
-                            outputs[key] = (existingCode != 0 || newCode != 0) ? Math.Max(existingCode, newCode).ToString() : "0";
+                            // Prefer the first non-zero (failure); never allow later values to downgrade to success.
+                            if (existingCode != 0)
+                            {
+                                outputs[key] = existingCode.ToString();
+                            }
+                            else
+                            {
+                                outputs[key] = newCode.ToString();
+                            }
                         }
                         else
                         {

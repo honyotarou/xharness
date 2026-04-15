@@ -9,6 +9,7 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.AspNetCore.StaticFiles;
+using System.Threading;
 using Microsoft.DotNet.XHarness.Common.Utilities;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.FileProviders;
@@ -134,6 +135,7 @@ internal sealed class LoopbackTestServerStartup
         app.UseWebSockets();
         if (options.OnConsoleConnected != null)
         {
+            int activeConsoleConnections = 0;
             app.UseRouter(router =>
             {
                 router.MapGet("/console", async context =>
@@ -150,8 +152,22 @@ internal sealed class LoopbackTestServerStartup
                         return;
                     }
 
-                    var socket = await context.WebSockets.AcceptWebSocketAsync();
-                    await options.OnConsoleConnected(socket);
+                    if (Interlocked.Increment(ref activeConsoleConnections) != 1)
+                    {
+                        Interlocked.Decrement(ref activeConsoleConnections);
+                        context.Response.StatusCode = StatusCodes.Status429TooManyRequests;
+                        return;
+                    }
+
+                    try
+                    {
+                        var socket = await context.WebSockets.AcceptWebSocketAsync();
+                        await options.OnConsoleConnected(socket);
+                    }
+                    finally
+                    {
+                        Interlocked.Decrement(ref activeConsoleConnections);
+                    }
                 });
             });
         }

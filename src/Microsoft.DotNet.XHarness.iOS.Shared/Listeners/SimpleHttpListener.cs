@@ -15,6 +15,7 @@ namespace Microsoft.DotNet.XHarness.iOS.Shared.Listeners;
 public class SimpleHttpListener : SimpleListener
 {
     public const int MaxRequestBodyBytes = TcpStreamLimits.MaxTestLogStreamBytes;
+    public static readonly TimeSpan ReadTimeout = TimeSpan.FromMinutes(2);
 
     private readonly bool _autoExit;
     private HttpListener _server;
@@ -106,6 +107,10 @@ public class SimpleHttpListener : SimpleListener
         if (request.HasEntityBody)
         {
             // Bound in-memory read (attacker: hostile device sends a huge body).
+            if (request.InputStream.CanTimeout)
+            {
+                request.InputStream.ReadTimeout = (int)ReadTimeout.TotalMilliseconds;
+            }
             data = StreamReadLimits.ReadToEndWithByteLimit(request.InputStream, MaxRequestBodyBytes);
         }
 
