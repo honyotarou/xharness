@@ -1,4 +1,4 @@
-﻿// Licensed to the .NET Foundation under one or more agreements.
+// Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 // See the LICENSE file in the project root for more information.
 
@@ -6,6 +6,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using Microsoft.DotNet.XHarness.Common.Utilities;
 using OpenQA.Selenium;
 
 namespace Microsoft.DotNet.XHarness.CLI.CommandArguments;
@@ -244,6 +245,10 @@ public abstract class PathArgument : StringArgument
         {
             throw new ArgumentException($"Required argument {Prototype} was not supplied");
         }
+        if (!string.IsNullOrEmpty(Value))
+        {
+            HostPathSecurity.ThrowIfUnsafeHostPath(Value, nameof(Value));
+        }
     }
 }
 
@@ -254,6 +259,12 @@ public abstract class RequiredPathArgument : RequiredStringArgument
     }
 
     public override void Action(string argumentValue) => Value = RootPath(argumentValue);
+
+    public override void Validate()
+    {
+        base.Validate();
+        HostPathSecurity.ThrowIfUnsafeHostPath(Value, nameof(Value));
+    }
 }
 
 public abstract class SwitchArgument : Argument<bool>

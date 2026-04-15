@@ -89,6 +89,20 @@ public class AdbRunnerTests : IDisposable
     }
 
     [Fact]
+    public void TryDumpAdbLog_RejectsUnsafeOutputPath()
+    {
+        var runner = new AdbRunner(_mainLog.Object, _processManager.Object, s_adbPath);
+        Assert.Throws<ArgumentException>(() => runner.TryDumpAdbLog("/tmp/../bad.log"));
+    }
+
+    [Fact]
+    public void PullFiles_RejectsUnsafeLocalPath()
+    {
+        var runner = new AdbRunner(_mainLog.Object, _processManager.Object, s_adbPath);
+        Assert.Throws<ArgumentException>(() => runner.PullFiles("pkg", "/sdcard", "/tmp/../out"));
+    }
+
+    [Fact]
     public void DumpBugReport()
     {
         var runner = new AdbRunner(_mainLog.Object, _processManager.Object, s_adbPath);
@@ -184,6 +198,24 @@ public class AdbRunnerTests : IDisposable
         string fakeApkName = $"{Path.GetRandomFileName()}";
         int exitCode = runner.KillApk(fakeApkName);
         VerifyAdbCall("shell", "am", "kill", "--user", "all", fakeApkName);
+        Assert.Equal(0, exitCode);
+    }
+
+    [Fact]
+    public void KillProcess_RejectsUnsafeName()
+    {
+        var runner = new AdbRunner(_mainLog.Object, _processManager.Object, s_adbPath);
+        Assert.Throws<ArgumentException>(() => runner.KillProcess(".*"));
+        Assert.Throws<ArgumentException>(() => runner.KillProcess("--help"));
+    }
+
+    [Fact]
+    public void KillProcess_UsesPidofAndKillNotPkill()
+    {
+        var runner = new AdbRunner(_mainLog.Object, _processManager.Object, s_adbPath);
+        int exitCode = runner.KillProcess("net.dot.E");
+        VerifyAdbCall("shell", "pidof", "net.dot.E");
+        VerifyAdbCall("shell", "kill", "-9", "1234");
         Assert.Equal(0, exitCode);
     }
 
@@ -429,6 +461,12 @@ public class AdbRunnerTests : IDisposable
                 if (string.Join(" ", arguments.Skip(argStart).Take(5)).Equals("shell pm list packages -3"))
                 {
                     stdOut = "package:" + string.Join("\npackage:", _fakeDeviceList.Single(d => d.DeviceSerial == s_currentDeviceSerial).InstalledApplications);
+                }
+
+                if (arguments.Length >= argStart + 2 && arguments[argStart + 1].Equals("pidof", StringComparison.Ordinal))
+                {
+                    // Return a single PID for tests.
+                    stdOut = "1234";
                 }
 
                 exitCode = 0;

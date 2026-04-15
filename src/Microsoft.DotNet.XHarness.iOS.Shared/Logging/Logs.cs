@@ -1,4 +1,4 @@
-﻿// Licensed to the .NET Foundation under one or more agreements.
+// Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 // See the LICENSE file in the project root for more information.
 
@@ -6,6 +6,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using Microsoft.DotNet.XHarness.Common.Logging;
+using Microsoft.DotNet.XHarness.Common.Utilities;
 using Microsoft.DotNet.XHarness.iOS.Shared.Utilities;
 
 namespace Microsoft.DotNet.XHarness.iOS.Shared.Logging;
@@ -18,13 +19,17 @@ public class Logs : List<IFileBackedLog>, ILogs
 
     public Logs(string directory)
     {
-        Directory = directory ?? throw new ArgumentNullException(nameof(directory));
+        ArgumentNullException.ThrowIfNull(directory);
+        HostPathSecurity.ThrowIfUnsafeHostPath(directory, nameof(directory));
+        Directory = directory;
     }
 
     public IFileBackedLog Create(string filename, string description, bool? timestamp = null)
     {
         System.IO.Directory.CreateDirectory(Directory);
-        var rv = new LogFile(description, Path.GetFullPath(Path.Combine(Directory, filename)));
+        var full = Path.GetFullPath(Path.Combine(Directory, filename));
+        HostPathSecurity.ThrowIfResolvedPathNotUnderBase(Directory, full, nameof(filename));
+        var rv = new LogFile(description, full);
         if (timestamp.HasValue)
         {
             rv.Timestamp = timestamp.Value;
@@ -49,14 +54,29 @@ public class Logs : List<IFileBackedLog>, ILogs
             throw new ArgumentNullException(nameof(path));
         }
 
-        if (!path.StartsWith(Directory, StringComparison.Ordinal))
+        HostPathSecurity.ThrowIfUnsafeHostPath(path, nameof(path));
+        string fullPath = Path.GetFullPath(path);
+        string baseResolved = Path.GetFullPath(Directory);
+        var comparison = OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
+        string basePrefix = baseResolved.EndsWith(Path.DirectorySeparatorChar) || baseResolved.EndsWith(Path.AltDirectorySeparatorChar)
+            ? baseResolved
+            : baseResolved + Path.DirectorySeparatorChar;
+        bool underBase = fullPath.Equals(baseResolved, comparison) || fullPath.StartsWith(basePrefix, comparison);
+
+        if (!underBase)
         {
             var newPath = Path.Combine(Directory, Path.GetFileNameWithoutExtension(path) + "-" + _helpers.Timestamp + Path.GetExtension(path));
-            File.Copy(path, newPath, true);
-            path = newPath;
+            fullPath = Path.GetFullPath(newPath);
+            HostPathSecurity.ThrowIfUnsafeHostPath(newPath, nameof(path));
+            HostPathSecurity.ThrowIfResolvedPathNotUnderBase(Directory, fullPath, nameof(path));
+            File.Copy(path, fullPath, true);
+        }
+        else
+        {
+            HostPathSecurity.ThrowIfResolvedPathNotUnderBase(Directory, fullPath, nameof(path));
         }
 
-        var log = new LogFile(name, path, true);
+        var log = new LogFile(name, fullPath, true);
         Add(log);
         return log;
     }
@@ -69,7 +89,9 @@ public class Logs : List<IFileBackedLog>, ILogs
             throw new ArgumentNullException(nameof(path));
         }
 
-        using (var rv = new LogFile(description, Path.Combine(Directory, path), false))
+        var full = Path.GetFullPath(Path.Combine(Directory, path));
+        HostPathSecurity.ThrowIfResolvedPathNotUnderBase(Directory, full, nameof(path));
+        using (var rv = new LogFile(description, full, false))
         {
             Add(rv);
             return rv.FullPath;

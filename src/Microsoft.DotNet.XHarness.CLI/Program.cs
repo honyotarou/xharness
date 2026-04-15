@@ -5,12 +5,7 @@
 using System;
 using System.Linq;
 using System.Runtime.InteropServices;
-using Microsoft.DotNet.XHarness.CLI.Android;
-using Microsoft.DotNet.XHarness.CLI.AndroidHeadless;
 using Microsoft.DotNet.XHarness.CLI.Commands;
-using Microsoft.DotNet.XHarness.CLI.Commands.Apple;
-using Microsoft.DotNet.XHarness.CLI.Commands.Wasm;
-using Microsoft.DotNet.XHarness.CLI.Commands.Wasi;
 using Microsoft.DotNet.XHarness.Common.CLI;
 using Mono.Options;
 
@@ -26,13 +21,13 @@ public static class Program
 
     public static int Main(string[] args)
     {
-        bool shouldOutput = !IsOutputSensitive(args);
+        bool shouldOutput = !CommandLineSensitiveOutput.IsSensitive(args);
 
-        if (shouldOutput)
+        if (shouldOutput && XHarnessEnvironmentOptions.ShouldLogIssuedCommandLine())
         {
             Console.WriteLine(
                 $"[{XHarnessVersionCommand.GetAssemblyVersion().ProductVersion}] " +
-                "XHarness command issued: " + string.Join(' ', args));
+                "XHarness command issued: " + IssuedCommandRedaction.FormatArgumentsForLog(args));
         }
 
         if (args.Length > 0)
@@ -67,73 +62,5 @@ public static class Program
         return result;
     }
 
-    public static CommandSet GetXHarnessCommandSet()
-    {
-#pragma warning disable IDE0028 // Simplify collection initialization for DEBUG
-        var commandSet = new CommandSet("xharness");
-#pragma warning restore IDE0028 // Simplify collection initialization for DEBUG
-
-#if !DEBUG
-            if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
-            {
-                commandSet.Add(new AppleCommandSet());
-            }
-#else
-        commandSet.Add(new AppleCommandSet());
-#endif
-
-        commandSet.Add(new AndroidCommandSet());
-        commandSet.Add(new AndroidHeadlessCommandSet());
-        commandSet.Add(new WasmCommandSet());
-        commandSet.Add(new WasiCommandSet());
-        commandSet.Add(new XHarnessHelpCommand());
-        commandSet.Add(new XHarnessVersionCommand());
-
-        return commandSet;
-    }
-
-    /// <summary>
-    /// Returns true when the command outputs data suitable for parsing and we should keep the output clean.
-    /// </summary>
-    private static bool IsOutputSensitive(string[] args)
-    {
-        if (args.Length > 0 && args[0] == "version")
-        {
-            return true;
-        }
-
-        if (args.Length < 2 || args.Contains("--help") || args.Contains("-h"))
-        {
-            return false;
-        }
-
-        var platform = args[0];
-        var command = args[1];
-
-        return platform switch
-        {
-            "apple" => command switch
-            {
-                "device" => true,
-                "state" => args.Contains("--json"),
-                "mlaunch" => true,
-                _ => false,
-            },
-            "android" => command switch
-            {
-                "device" => true,
-                "state" => args.Contains("--json"),
-                "adb" => true,
-                _ => false,
-            },
-            "android-headless" => command switch
-            {
-                "device" => true,
-                "state" => args.Contains("--json"),
-                "adb" => true,
-                _ => false,
-            },
-            _ => false,
-        };
-    }
+    public static CommandSet GetXHarnessCommandSet() => XHarnessRootCommandRegistry.CreateRootCommandSet();
 }

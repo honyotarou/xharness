@@ -45,6 +45,8 @@ stages:
               _BuildConfig: Debug
               _PublishArgs: /p:Publish=false
         steps:
+        - template: /eng/check-encapsulation.yml
+
         - script: eng\common\CIBuild.cmd
             -configuration $(_BuildConfig)
             -prepareMachine
@@ -89,6 +91,8 @@ stages:
               _BuildConfig: Debug
               _PublishArgs: /p:Publish=false
         steps:
+        - template: /eng/check-encapsulation.yml
+
         - script: eng/common/cibuild.sh
             --configuration $(_BuildConfig)
             --prepareMachine

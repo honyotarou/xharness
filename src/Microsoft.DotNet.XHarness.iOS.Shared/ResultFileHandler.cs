@@ -8,8 +8,10 @@ using System.IO;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.DotNet.XHarness.Common.CLI;
 using Microsoft.DotNet.XHarness.Common.Execution;
 using Microsoft.DotNet.XHarness.Common.Logging;
+using Microsoft.DotNet.XHarness.Common.Utilities;
 using Microsoft.DotNet.XHarness.iOS.Shared.Execution;
 
 #nullable enable
@@ -81,18 +83,12 @@ public class ResultFileHandler : IResultFileHandler
             ? "/Documents/test-results.xml"
             : "/Library/Caches/Documents/test-results.xml";
 
+        ResultFileHostPathValidator.ValidateHostDestinationPath(hostDestinationPath);
+        CliTokenValidator.ThrowIfContainsControlCharacters(udid, nameof(udid));
+        CliTokenValidator.ThrowIfContainsControlCharacters(bundleIdentifier, nameof(bundleIdentifier));
+
         if (IsVersionSupported(osVersion, isSimulator))
         {
-            string cmd;
-            if (isSimulator)
-            {
-                cmd = $"cp \"$(xcrun simctl get_app_container {udid} {bundleIdentifier} data){sourcePath}\" \"{hostDestinationPath}\"";
-            }
-            else
-            {
-                cmd = $"xcrun devicectl device copy from --device {udid} --source {sourcePath} --destination {hostDestinationPath} --user mobile --domain-type appDataContainer --domain-identifier {bundleIdentifier}";
-            }
-
             // Retry up to 3 times with increasing delays to handle transient device communication errors
             // (e.g., com.apple.Mercury.error 1000 or RSD error 0xE8000003 on tvOS devices).
             for (int attempt = 0; attempt <= _retryDelaysMs.Length; attempt++)
@@ -110,14 +106,64 @@ public class ResultFileHandler : IResultFileHandler
                     }
                 }
 
-                await _processManager.ExecuteCommandAsync(
-                    "/bin/bash",
-                    new[] { "-c", cmd },
-                    _mainLog,
-                    _mainLog,
-                    _mainLog,
-                    TimeSpan.FromMinutes(1),
-                    null);
+                if (isSimulator)
+                {
+                    var stdoutMemory = new MemoryLog { Timestamp = false };
+                    ProcessExecutionResult getContainerResult = await _processManager.ExecuteCommandAsync(
+                        ResultFileCopyArguments.XcrunExecutable,
+                        ResultFileCopyArguments.XcrunSimctlGetAppContainer(udid, bundleIdentifier),
+                        _mainLog,
+                        stdoutMemory,
+                        _mainLog,
+                        TimeSpan.FromMinutes(1),
+                        null);
+
+                    if (getContainerResult != null && getContainerResult.Succeeded)
+                    {
+                        string containerPath = stdoutMemory.ToString().Trim();
+                        if (!string.IsNullOrEmpty(containerPath))
+                        {
+                            string fullSource = ResultFileCopyArguments.CombineSimulatorContainerPath(containerPath, sourcePath);
+                            ProcessExecutionResult cpResult = await _processManager.ExecuteCommandAsync(
+                                ResultFileCopyArguments.CpExecutable,
+                                new[] { fullSource, hostDestinationPath },
+                                _mainLog,
+                                _mainLog,
+                                _mainLog,
+                                TimeSpan.FromMinutes(1),
+                                null);
+
+                            if (cpResult == null || !cpResult.Succeeded)
+                            {
+                                _mainLog.WriteLine("cp failed to copy test results from simulator app container.");
+                            }
+                        }
+                        else
+                        {
+                            _mainLog.WriteLine("simctl get_app_container returned an empty path.");
+                        }
+                    }
+                    else
+                    {
+                        _mainLog.WriteLine("simctl get_app_container failed or did not succeed.");
+                    }
+                }
+                else
+                {
+                    ProcessExecutionResult copyResult = await _processManager.ExecuteCommandAsync(
+                        ResultFileCopyArguments.XcrunExecutable,
+                        ResultFileCopyArguments.XcrunDevicectlCopyFrom(udid, sourcePath, hostDestinationPath, bundleIdentifier),
+                        _mainLog,
+                        _mainLog,
+                        _mainLog,
+                        TimeSpan.FromMinutes(1),
+                        null);
+
+                    if (copyResult == null || !copyResult.Succeeded)
+                    {
+                        _mainLog.WriteLine("devicectl copy failed.");
+                    }
+                }
 
                 if (File.Exists(hostDestinationPath))
                 {
@@ -162,6 +208,11 @@ public class ResultFileHandler : IResultFileHandler
             _mainLog.WriteLine("Failed to list crash reports from device.");
             return;
         }
+
+        FilePayloadSecurity.ThrowIfFileExceedsMaxBytes(
+            tempCrashListFile,
+            nameof(tempCrashListFile),
+            FilePayloadSecurity.DefaultMaxCrashListFileBytes);
 
         List<string> crashReports = File.ReadAllLines(tempCrashListFile)
             .Where(line => !string.IsNullOrWhiteSpace(line))
@@ -218,6 +269,12 @@ public class ResultFileHandler : IResultFileHandler
             _mainLog.WriteLine("Failed to download crash report from device.");
             return;
         }
+
+        HostPathSecurity.ThrowIfUnsafeHostPath(crashReportContent, nameof(crashReportContent));
+        FilePayloadSecurity.ThrowIfFileExceedsMaxBytes(
+            crashReportContent,
+            nameof(crashReportContent),
+            FilePayloadSecurity.DefaultMaxCrashReportTextBytes);
 
         // Dump the crash report content to the log
         _mainLog.WriteLine($"==================== Crash report ====================");

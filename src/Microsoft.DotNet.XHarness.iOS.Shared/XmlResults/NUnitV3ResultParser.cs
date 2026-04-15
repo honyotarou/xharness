@@ -1,10 +1,11 @@
-﻿// Licensed to the .NET Foundation under one or more agreements.
+// Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 // See the LICENSE file in the project root for more information.
 
 using System;
 using System.IO;
 using System.Xml;
+using Microsoft.DotNet.XHarness.Common.Xml;
 
 #nullable enable
 namespace Microsoft.DotNet.XHarness.iOS.Shared.XmlResults;
@@ -17,12 +18,7 @@ public class NUnitV3ResultParser : IXmlResultParser
         var failedTestRun = false; // result = "Failed"
         testcasecount = passed = failed = inconclusive = skipped = 0L;
 
-        var settings = new XmlReaderSettings
-        {
-            IgnoreWhitespace = true,
-            IgnoreComments = true,
-            IgnoreProcessingInstructions = true
-        };
+        var settings = SecureXmlReaderSettings.Create(ignoreWhitespace: true);
 
         using (var reader = XmlReader.Create(source, settings))
         {

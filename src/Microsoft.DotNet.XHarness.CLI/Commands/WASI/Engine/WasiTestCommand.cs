@@ -92,6 +92,12 @@ internal class WasiTestCommand : XHarnessCommand<WasiTestCommandArguments>
                         engineArgs.Add($"{envVariable}={serverURLs!.Https}");
                     }
                 }
+
+                if (!string.IsNullOrEmpty(serverURLs!.StatefulSessionToken))
+                {
+                    engineArgs.Add("--env");
+                    engineArgs.Add($"{WebServerStatefulSession.EnvironmentVariableName}={serverURLs.StatefulSessionToken}");
+                }
             }
             
             engineArgs.AddRange(PassThroughArguments);

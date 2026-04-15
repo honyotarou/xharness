@@ -20,7 +20,7 @@ internal class XHarnessVersionCommand : Command
             Console.WriteLine(version.ProductVersion);
             return 0;
         }
-        
+
         // Print the name of the tool and the version number unix style
         // Example:
         // Apple clang version 11.0.3 (clang-1103.0.32.29)

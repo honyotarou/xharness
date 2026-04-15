@@ -7,6 +7,7 @@ using System.IO;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Microsoft.DotNet.XHarness.Common.CLI;
+using Microsoft.DotNet.XHarness.Common.Utilities;
 using Microsoft.Extensions.Logging;
 
 namespace Microsoft.DotNet.XHarness.Common;
@@ -96,6 +97,7 @@ public static class RunSummaryEmitter
         int? instrumentationExitCode,
         IReadOnlyList<DiagnosticsFile> producedFiles)
     {
+        HostPathSecurity.ThrowIfUnsafeHostPath(outputDirectory, nameof(outputDirectory));
         try
         {
             var resultData = BuildResultData(exitCode, platform, deviceName, deviceOsVersion, architecture, instrumentationExitCode, producedFiles);

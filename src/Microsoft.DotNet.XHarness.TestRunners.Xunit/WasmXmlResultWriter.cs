@@ -1,4 +1,4 @@
-﻿// Licensed to the .NET Foundation under one or more agreements.
+// Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 // See the LICENSE file in the project root for more information.
 
@@ -9,6 +9,7 @@ using System.Net.Http.Headers;
 using System.Runtime.InteropServices.JavaScript;
 using System.Threading.Tasks;
 using System.Xml.Linq;
+using Microsoft.DotNet.XHarness.Common.Utilities;
 
 #nullable enable
 
@@ -51,6 +52,12 @@ internal class WasmXmlResultWriter
                     req.Content = new StreamContent(ms);
                     req.Content.Headers.ContentType = new MediaTypeHeaderValue("application/xml");
                     req.Content.Headers.ContentLength = ms.Length;
+
+                    string? session = Environment.GetEnvironmentVariable(WebServerStatefulSession.EnvironmentVariableName);
+                    if (!string.IsNullOrEmpty(session))
+                    {
+                        req.Headers.TryAddWithoutValidation(WebServerStatefulSession.HeaderName, session);
+                    }
 
                     using var httpClient = new HttpClient();
                     using var response = await httpClient.SendAsync(req);

@@ -1,4 +1,4 @@
-﻿// Licensed to the .NET Foundation under one or more agreements.
+// Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 // See the LICENSE file in the project root for more information.
 
@@ -51,6 +51,10 @@ public class SimpleFileListenerTest : IDisposable
 
     [Fact]
     public void ConstructorNullPathTest() => Assert.Throws<ArgumentNullException>(() => new SimpleFileListener(null, _log.Object, _testLog.Object, false));
+
+    [Fact]
+    public void Constructor_RejectsTraversalPath() =>
+        Assert.Throws<ArgumentException>(() => new SimpleFileListener("/tmp/../x", _log.Object, _testLog.Object, false));
 
     [Theory]
     [InlineData("Tests run: ", false)]

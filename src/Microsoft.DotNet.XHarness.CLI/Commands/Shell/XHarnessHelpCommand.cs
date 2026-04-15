@@ -1,4 +1,4 @@
-﻿// Licensed to the .NET Foundation under one or more agreements.
+// Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 // See the LICENSE file in the project root for more information.
 
@@ -7,6 +7,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.InteropServices;
 using Microsoft.DotNet.XHarness.CLI.Android;
+using Microsoft.DotNet.XHarness.CLI.AndroidHeadless;
 using Microsoft.DotNet.XHarness.CLI.Commands.Apple;
 using Microsoft.DotNet.XHarness.CLI.Commands.Apple.Simulators;
 using Microsoft.DotNet.XHarness.CLI.Commands.Wasm;
@@ -43,6 +44,9 @@ internal class XHarnessHelpCommand : HelpCommand
             case "android":
                 PrintCommandHelp(new AndroidCommandSet(), subCommand);
                 break;
+            case "android-headless":
+                PrintCommandHelp(new AndroidHeadlessCommandSet(), subCommand);
+                break;
             case "apple":
 #if !DEBUG
                     if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
@@ -72,7 +76,7 @@ internal class XHarnessHelpCommand : HelpCommand
                 PrintCommandHelp(new WasiCommandSet(), subCommand);
                 break;
             default:
-                Console.WriteLine($"No help available for command '{command}'. Allowed commands are 'apple', 'wasm', 'wasi' and 'android'");
+                Console.WriteLine($"No help available for command '{command}'. Allowed commands are 'apple', 'wasm', 'wasi', 'android', and 'android-headless'");
                 break;
         }
 

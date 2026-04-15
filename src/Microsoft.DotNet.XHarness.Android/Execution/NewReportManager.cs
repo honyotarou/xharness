@@ -1,5 +1,6 @@
-﻿using System;
+using System;
 using System.Threading;
+using Microsoft.DotNet.XHarness.Common.Utilities;
 using Microsoft.Extensions.Logging;
 
 namespace Microsoft.DotNet.XHarness.Android.Execution;
@@ -14,6 +15,7 @@ class NewReportManager : IReportManager
 
     public string DumpBugReport(AdbRunner runner, string outputFilePathWithoutFormat)
     {
+        HostPathSecurity.ThrowIfUnsafeHostPath(outputFilePathWithoutFormat, nameof(outputFilePathWithoutFormat));
         // give some time for bug report to be available
         Thread.Sleep(3000);
 

@@ -1,4 +1,4 @@
-﻿// Licensed to the .NET Foundation under one or more agreements.
+// Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 // See the LICENSE file in the project root for more information.
 
@@ -6,6 +6,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.DotNet.XHarness.CLI.CommandArguments.Wasm;
 using Microsoft.DotNet.XHarness.CLI.Commands;
+using Microsoft.DotNet.XHarness.CLI.Commands.LoopbackTestServer;
 using Microsoft.DotNet.XHarness.Common;
 using Microsoft.DotNet.XHarness.Common.CLI;
 using Microsoft.Extensions.DependencyInjection;
@@ -30,7 +31,7 @@ internal class WebServerCommand : XHarnessCommand<WebServerCommandArguments>
     protected override async Task<ExitCode> InvokeInternal(ILogger logger)
     {
         var cts = new CancellationTokenSource();
-        var webServerOptions = WebServer.TestWebServerOptions.FromArguments(Arguments);
+        var webServerOptions = WebServerOptions.FromArguments(Arguments);
         webServerOptions.ContentRoot = Arguments.AppPackagePath;
         ServerURLs serverURLs = await WebServer.Start(
             webServerOptions,

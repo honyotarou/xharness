@@ -1,4 +1,4 @@
-﻿// Licensed to the .NET Foundation under one or more agreements.
+// Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 // See the LICENSE file in the project root for more information.
 
@@ -6,6 +6,7 @@ using System;
 using System.IO;
 using System.Text.RegularExpressions;
 using Microsoft.DotNet.XHarness.Common.Logging;
+using Microsoft.DotNet.XHarness.Common.Utilities;
 using Microsoft.DotNet.XHarness.iOS.Shared;
 
 namespace Microsoft.DotNet.XHarness.Apple;
@@ -68,7 +69,7 @@ public abstract class ExitCodeDetector : IExitCodeDetector
         return null;
     }
 
-    protected Regex EoLExitCodeRegex { get; } = new Regex(@" (?<exitCode>-?[0-9]+)$", RegexOptions.Compiled);
+    protected Regex EoLExitCodeRegex { get; } = RegexSecurity.Create(@" (?<exitCode>-?[0-9]+)$");
 
     // Example line coming from app's stdout log stream
     // 2022-03-18 12:48:53.336 I  Microsoft.Extensions.Configuration.CommandLine.Tests[12477:10069] DOTNET.APP_EXIT_CODE: 0
@@ -87,9 +88,9 @@ public class iOSExitCodeDetector : ExitCodeDetector, IiOSExitCodeDetector
     // [07:02:21.6637600] Application 'net.dot.iOS.Simulator.PInvoke.Test' terminated (with exit code '42' and/or crashing signal ').
     private Regex[] DeviceExitCodeRegexes { get; } = new Regex[]
     {
-        new Regex(@"terminated \(with exit code '(?<exitCode>-?[0-9]+)' and/or crashing signal", RegexOptions.Compiled),
-        new Regex(@"Failed to execute 'devicectl':.*returned the exit code (?<exitCode>\d+)\.", RegexOptions.Compiled),
-        new Regex(@"Process mlaunch exited with (?<exitCode>\d+)\.?", RegexOptions.Compiled)
+        RegexSecurity.Create(@"terminated \(with exit code '(?<exitCode>-?[0-9]+)' and/or crashing signal"),
+        RegexSecurity.Create(@"Failed to execute 'devicectl':.*returned the exit code (?<exitCode>\d+)\."),
+        RegexSecurity.Create(@"Process mlaunch exited with (?<exitCode>\d+)\.?")
     };
 
     protected override Match? IsSignalLine(AppBundleInformation appBundleInfo, string logLine)

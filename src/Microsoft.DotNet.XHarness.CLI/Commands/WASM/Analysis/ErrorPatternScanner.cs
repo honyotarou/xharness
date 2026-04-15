@@ -3,12 +3,16 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text.RegularExpressions;
+using Microsoft.DotNet.XHarness.Common.Utilities;
 using Microsoft.Extensions.Logging;
 
 namespace Microsoft.DotNet.XHarness.CLI.Commands.Wasm;
 
 public class ErrorPatternScanner
 {
+    private const int MaxRegexPatternLength = 100_000;
+    private const int MaxCompiledRegexPatterns = 500;
+
     private readonly ILogger _logger;
     private readonly List<string> _errorPatternStrings = new();
     private readonly List<Regex> _errorPatternRegexes = new();
@@ -20,8 +24,11 @@ public class ErrorPatternScanner
         if (string.IsNullOrEmpty(patternsFile))
             throw new ArgumentNullException(nameof(patternsFile));
 
+        HostPathSecurity.ThrowIfUnsafeHostPath(patternsFile, nameof(patternsFile));
         if (!File.Exists(patternsFile))
             throw new FileNotFoundException(patternsFile);
+
+        FilePayloadSecurity.ThrowIfFileExceedsMaxBytes(patternsFile, nameof(patternsFile));
 
         foreach (string line in File.ReadAllLines(patternsFile))
         {
@@ -43,9 +50,19 @@ public class ErrorPatternScanner
 
                 case '%':
                     {
+                        if (pattern.Length > MaxRegexPatternLength)
+                        {
+                            _logger.LogWarning($"ErrorPatternScanner: Skipping regex pattern longer than {MaxRegexPatternLength} characters.");
+                            break;
+                        }
+                        if (_errorPatternRegexes.Count >= MaxCompiledRegexPatterns)
+                        {
+                            _logger.LogWarning($"ErrorPatternScanner: Maximum number of compiled regex patterns ({MaxCompiledRegexPatterns}) reached; ignoring the rest.");
+                            break;
+                        }
                         try
                         {
-                            _errorPatternRegexes.Add(new Regex(pattern, RegexOptions.Compiled | RegexOptions.IgnoreCase));
+                            _errorPatternRegexes.Add(RegexSecurity.Create(pattern, RegexOptions.IgnoreCase));
                         }
                         catch (Exception ex) when (ex is ArgumentException || ex is ArgumentNullException || ex is ArgumentOutOfRangeException)
                         {

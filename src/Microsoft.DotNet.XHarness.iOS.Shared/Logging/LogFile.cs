@@ -1,10 +1,11 @@
-﻿// Licensed to the .NET Foundation under one or more agreements.
+// Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 // See the LICENSE file in the project root for more information.
 
 using System;
 using System.IO;
 using Microsoft.DotNet.XHarness.Common.Logging;
+using Microsoft.DotNet.XHarness.Common.Utilities;
 
 namespace Microsoft.DotNet.XHarness.iOS.Shared.Logging;
 
@@ -21,6 +22,7 @@ public class LogFile : FileBackedLog
         : base(description)
     {
         FullPath = path ?? throw new ArgumentNullException(nameof(path));
+        HostPathSecurity.ThrowIfUnsafeHostPath(path, nameof(path));
         if (!append)
         {
             File.WriteAllText(path, string.Empty);

@@ -8,6 +8,7 @@ using System.IO;
 using System.Reflection;
 using System.Threading.Tasks;
 using Microsoft.DotNet.XHarness.Common;
+using Microsoft.DotNet.XHarness.Common.Utilities;
 
 namespace Microsoft.DotNet.XHarness.TestRunners.Common;
 
@@ -170,7 +171,9 @@ public abstract class TestRunner
             Directory.CreateDirectory(resultsPath);
         }
 
-        return Path.Combine(resultsPath, ResultsFileName);
+        string fullPath = Path.Combine(resultsPath, ResultsFileName);
+        HostPathSecurity.ThrowIfUnsafeHostPath(fullPath, nameof(ResultsFileName));
+        return fullPath;
     }
 
     protected virtual void OnTestStarted(string testName) => TestStarted?.Invoke(this, testName);

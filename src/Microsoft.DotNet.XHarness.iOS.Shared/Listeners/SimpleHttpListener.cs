@@ -1,4 +1,4 @@
-﻿// Licensed to the .NET Foundation under one or more agreements.
+// Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 // See the LICENSE file in the project root for more information.
 
@@ -7,6 +7,7 @@ using System.IO;
 using System.Net;
 using System.Net.Sockets;
 using Microsoft.DotNet.XHarness.Common.Logging;
+using Microsoft.DotNet.XHarness.Common.Networking;
 
 namespace Microsoft.DotNet.XHarness.iOS.Shared.Listeners;
 
@@ -35,11 +36,12 @@ public class SimpleHttpListener : SimpleListener
         // Try and find an unused port
         int attemptsLeft = 50;
         var r = new Random((int)DateTime.Now.Ticks);
+        string prefixHost = TcpListenerAddressResolver.GetHttpListenerPrefixHost();
         while (attemptsLeft-- > 0)
         {
             var newPort = r.Next(49152, 65535); // The suggested range for dynamic ports is 49152-65535 (IANA)
             _server.Prefixes.Clear();
-            _server.Prefixes.Add("http://*:" + newPort + "/");
+            _server.Prefixes.Add("http://" + prefixHost + ":" + newPort + "/");
             try
             {
                 _server.Start();

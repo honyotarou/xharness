@@ -1,8 +1,9 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.IO.Compression;
 using System.Linq;
+using Microsoft.DotNet.XHarness.Common.Utilities;
 
 namespace Microsoft.DotNet.XHarness.Android;
 
@@ -14,6 +15,7 @@ public static class ApkHelper
         {
             throw new ArgumentException("Please supply a value for apkPath");
         }
+        HostPathSecurity.ThrowIfUnsafeHostPath(apkPath, nameof(apkPath));
         if (!File.Exists(apkPath))
         {
             throw new FileNotFoundException($"Invalid APK Path: '{apkPath}'", apkPath);

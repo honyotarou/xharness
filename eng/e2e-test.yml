@@ -48,3 +48,4 @@ stages:
             env:
               SYSTEM_ACCESSTOKEN: $(System.AccessToken)
               HelixAccessToken: ''
+              XHARNESS_LOG_ISSUED_COMMAND: 'false'

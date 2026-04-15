@@ -13,7 +13,9 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Web;
 using Microsoft.DotNet.XHarness.CLI.CommandArguments.Wasm;
+using Microsoft.DotNet.XHarness.CLI.Commands.LoopbackTestServer;
 using Microsoft.DotNet.XHarness.Common.CLI;
+using Microsoft.DotNet.XHarness.Common.Utilities;
 using Microsoft.Extensions.Logging;
 using OpenQA.Selenium;
 using OpenQA.Selenium.DevTools;
@@ -32,7 +34,8 @@ internal class WasmBrowserTestRunner
 
     // Messages from selenium prepend the url, and location where the message originated
     // Eg. `foo` becomes `http://localhost:8000/xyz.js 0:12 "foo"
-    static readonly Regex s_consoleLogRegex = new(@"^\s*[a-z]*://[^\s]+\s+\d+:\d+\s+""(.*)""\s*$", RegexOptions.Compiled);
+    static readonly Regex s_consoleLogRegex = RegexSecurity.Create(
+        @"^\s*[a-z]*://[^\s]+\s+\d+:\d+\s+""(.*)""\s*$");
 
     public WasmBrowserTestRunner(WasmTestBrowserCommandArguments arguments, IEnumerable<string> passThroughArguments,
                                         WasmTestMessagesProcessor messagesProcessor, ILogger logger)
@@ -58,7 +61,7 @@ internal class WasmBrowserTestRunner
             var consolePumpTcs = new TaskCompletionSource<bool>();
             var logProcessorTask = Task.Run(() => _messagesProcessor.RunAsync(cts.Token));
 
-            var webServerOptions = WebServer.TestWebServerOptions.FromArguments(_arguments);
+            var webServerOptions = WebServerOptions.FromArguments(_arguments);
             webServerOptions.ContentRoot = _arguments.AppPackagePath;
             webServerOptions.OnConsoleConnected = socket => RunConsoleMessagesPump(socket, cts.Token);
             ServerURLs serverURLs = await WebServer.Start(
@@ -239,6 +242,16 @@ internal class WasmBrowserTestRunner
                     sb.Append('&');
                 sb.Append($"arg={HttpUtility.UrlEncode($"--setenv={envVariable}={serverURLs!.Https}")}");
             }
+        }
+
+        if (!string.IsNullOrEmpty(serverURLs.StatefulSessionToken))
+        {
+            if (sb.Length > 0)
+            {
+                sb.Append('&');
+            }
+
+            sb.Append($"arg={HttpUtility.UrlEncode($"--setenv={WebServerStatefulSession.EnvironmentVariableName}={serverURLs.StatefulSessionToken}")}");
         }
 
         foreach (var arg in _passThroughArguments)

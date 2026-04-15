@@ -1,4 +1,4 @@
-﻿// Licensed to the .NET Foundation under one or more agreements.
+// Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 // See the LICENSE file in the project root for more information.
 
@@ -6,6 +6,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Reflection;
+using Microsoft.DotNet.XHarness.Common.Utilities;
 using Microsoft.DotNet.XHarness.TestRunners.Common;
 using Microsoft.DotNet.XHarness.TestRunners.Xunit;
 
@@ -57,6 +58,7 @@ public class DefaultAndroidEntryPoint : AndroidApplicationEntryPoint
         }
 
         _resultsPath = Path.Combine(resultsPath, _parsedArguments[ResultsFileArgumentName]);
+        HostPathSecurity.ThrowIfUnsafeHostPath(_resultsPath, nameof(_resultsPath));
         _excludeCategoriesDir = _parsedArguments.GetValueOrDefault(ExcludeCategoriesDirArgumentName);
         _excludeCategoriesFile = _parsedArguments.GetValueOrDefault(ExcludeCategoriesFileArgumentName);
     }

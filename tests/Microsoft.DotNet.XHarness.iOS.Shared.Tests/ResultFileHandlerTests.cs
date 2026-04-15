@@ -294,6 +294,75 @@ public class ResultFileHandlerTests : IDisposable
     }
 
     [Fact]
+    public async Task CopyResultsAsync_NeverInvokesShell()
+    {
+        Mock<IMlaunchProcessManager> pm = new Mock<IMlaunchProcessManager>();
+        Mock<IFileBackedLog> log = new Mock<IFileBackedLog>();
+        ResultFileHandler handler = CreateHandler(pm, log);
+
+        pm.Setup(m => m.ExecuteCommandAsync(
+                It.IsAny<string>(),
+                It.IsAny<IList<string>>(),
+                It.IsAny<ILog>(),
+                It.IsAny<ILog>(),
+                It.IsAny<ILog>(),
+                It.IsAny<TimeSpan>(),
+                It.IsAny<Dictionary<string, string>>(),
+                It.IsAny<CancellationToken?>()))
+            .Returns(Task.FromResult(new ProcessExecutionResult { ExitCode = 0 }));
+
+        await handler.CopyResultsAsync(
+            RunMode.iOS, false, "18.0", "udid", "bundle", _tempFile);
+
+        pm.Verify(m => m.ExecuteCommandAsync(
+            "/bin/bash",
+            It.IsAny<IList<string>>(),
+            It.IsAny<ILog>(),
+            It.IsAny<ILog>(),
+            It.IsAny<ILog>(),
+            It.IsAny<TimeSpan>(),
+            It.IsAny<Dictionary<string, string>>(),
+            It.IsAny<CancellationToken?>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task CopyResultsAsync_SimulatorNeverInvokesShell()
+    {
+        Mock<IMlaunchProcessManager> pm = new Mock<IMlaunchProcessManager>();
+        Mock<IFileBackedLog> log = new Mock<IFileBackedLog>();
+        ResultFileHandler handler = CreateHandler(pm, log);
+
+        pm.Setup(m => m.ExecuteCommandAsync(
+                It.IsAny<string>(),
+                It.IsAny<IList<string>>(),
+                It.IsAny<ILog>(),
+                It.IsAny<ILog>(),
+                It.IsAny<ILog>(),
+                It.IsAny<TimeSpan>(),
+                It.IsAny<Dictionary<string, string>>(),
+                It.IsAny<CancellationToken?>()))
+            .Returns(Task.FromResult(new ProcessExecutionResult { ExitCode = 0 }));
+
+        if (File.Exists(_tempFile))
+        {
+            File.Delete(_tempFile);
+        }
+
+        await handler.CopyResultsAsync(
+            RunMode.iOS, true, "Simulator 18.0", "udid", "bundle", _tempFile);
+
+        pm.Verify(m => m.ExecuteCommandAsync(
+            "/bin/bash",
+            It.IsAny<IList<string>>(),
+            It.IsAny<ILog>(),
+            It.IsAny<ILog>(),
+            It.IsAny<ILog>(),
+            It.IsAny<TimeSpan>(),
+            It.IsAny<Dictionary<string, string>>(),
+            It.IsAny<CancellationToken?>()), Times.Never);
+    }
+
+    [Fact]
     public async Task CopyResultsAsync_WhenAllRetriesFail_ReturnsFalse()
     {
         Mock<IMlaunchProcessManager> pm = new Mock<IMlaunchProcessManager>();

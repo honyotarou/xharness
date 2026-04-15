@@ -1,4 +1,4 @@
-﻿// Licensed to the .NET Foundation under one or more agreements.
+// Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 // See the LICENSE file in the project root for more information.
 
@@ -44,6 +44,17 @@ public class LogsTest : IDisposable
 
     [Fact]
     public void ConstructorNullDirTest() => Assert.Throws<ArgumentNullException>(() => new Logs(null));
+
+    [Fact]
+    public void Constructor_RejectsTraversalDirectory() =>
+        Assert.Throws<ArgumentException>(() => new Logs("/tmp/../etc"));
+
+    [Fact]
+    public void Create_RejectsFilenameThatEscapesBaseDirectory()
+    {
+        using var logs = new Logs(_directory);
+        Assert.Throws<ArgumentException>(() => logs.Create("../../../escape.log", _description));
+    }
 
     [Fact]
     public void CreateFileTest()

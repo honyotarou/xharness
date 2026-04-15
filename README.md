@@ -98,6 +98,8 @@ There are other settings which can be controlled via **environmental variables**
 - `XHARNESS_LOG_WITH_TIMESTAMPS` - enable timestamps for logging
 - `XHARNESS_LOG_TEST_START` - log test start messages, useful to diagnose when tests are hanging. Currently only works for WebAssembly
 - `XHARNESS_MLAUNCH_PATH` - local path to the mlaunch binary when developing XHarness (when not using as .NET tool)
+- `XHARNESS_LOG_ISSUED_COMMAND` - set to `false` or `0` to stop printing the full command line on startup (avoids leaking secrets passed as CLI arguments into logs). Azure Pipelines in this repo sets this to `false` via `eng/common-variables.yml` (and E2E Helix jobs in `eng/e2e-test.yml`). When logging is enabled, flag values for names containing `token`, `password`, `secret`, etc. are replaced with `[REDACTED]` in that line.
+- `XHARNESS_TCP_BIND_LOOPBACK_ONLY` - set to `true` or `1` to bind TCP test listeners to loopback only (reduces exposure on shared networks; default allows LAN for physical devices). Not enabled in official CI so device/E2E tests keep the default bind behavior.
 
 ### Arcade/Helix integration
 
@@ -150,6 +152,9 @@ Currently we support Xunit and NUnit test assemblies but the `Microsoft.DotNet.X
 
 ## Development instructions
 When working on XHarness, there are couple of neat hacks that can improve the inner loop.
+
+If you have **Node.js** installed, you can run a single local gate (encapsulation: **ProjectReference** + **cross-project `Compile Include` allowlist**, then build, then test) with **`pnpm harness`** or **`npm run harness`** from the repository root. The script is `scripts/check-encapsulation.mjs` — register new projects in `allowedProjectReferences`, and any **linked source from outside the project folder** in `allowedCompileIncludeOverrides`. **Azure Pipelines** runs the same check before the main build on the Windows and macOS unit-test jobs (`eng/check-encapsulation.yml`).
+
 The repository can either be built using regular .NET, assuming you have new enough version:
 ```
 dotnet build XHarness.slnx

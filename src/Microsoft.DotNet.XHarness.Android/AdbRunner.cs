@@ -1,4 +1,4 @@
-﻿// Licensed to the .NET Foundation under one or more agreements.
+// Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 // See the LICENSE file in the project root for more information.
 
@@ -9,14 +9,18 @@ using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Threading;
 using Microsoft.DotNet.XHarness.Android.Execution;
+using Microsoft.DotNet.XHarness.Common.Utilities;
 using Microsoft.Extensions.Logging;
 
 namespace Microsoft.DotNet.XHarness.Android;
 
 public class AdbRunner
 {
+    private static readonly Regex s_safeAndroidIdentifier = new(@"^[A-Za-z0-9._-]+$", RegexOptions.Compiled | RegexOptions.CultureInvariant);
+
     private enum AdbProperty
     {
         Architecture,
@@ -145,6 +149,7 @@ public class AdbRunner
 
     public bool TryDumpAdbLog(string outputFilePath, string filterSpec = "")
     {
+        HostPathSecurity.ThrowIfUnsafeHostPath(outputFilePath, nameof(outputFilePath));
         // Workaround: Doesn't seem to have a flush() function and sometimes it doesn't have the full log on emulators.
         Thread.Sleep(3000);
 
@@ -794,8 +799,41 @@ public class AdbRunner
 
     public int KillProcess(string testName)
     {
+        if (string.IsNullOrWhiteSpace(testName))
+        {
+            throw new ArgumentNullException(nameof(testName));
+        }
+
+        // Avoid regex/pattern interpretation by pkill (attack: testName=".*" kills everything).
+        // We only accept a conservative identifier and then resolve PIDs explicitly via pidof.
+        if (!s_safeAndroidIdentifier.IsMatch(testName) || testName.StartsWith("-", StringComparison.Ordinal) || testName.Length > 128)
+        {
+            throw new ArgumentException("Unsafe process name.", nameof(testName));
+        }
+
         _log.LogInformation($"Killing all running processes for '{testName}': ");
-        var result = RunAdbCommand(new[] { "shell", "pkill", testName });
+        var pidof = RunAdbCommand(new[] { "shell", "pidof", testName });
+        if (!pidof.Succeeded)
+        {
+            _log.LogWarning($"Failed to resolve process IDs for '{testName}' (pidof). Skipping kill. Output:{Environment.NewLine}{pidof}");
+            return pidof.ExitCode;
+        }
+
+        // pidof output is a space-separated list of PIDs.
+        var pids = pidof.StandardOutput
+            .Split(new[] { ' ', '\t', '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries)
+            .Where(s => int.TryParse(s, out _))
+            .ToArray();
+
+        if (pids.Length == 0)
+        {
+            _log.LogDebug($"No processes found for '{testName}' (pidof returned none).");
+            return (int)AdbExitCodes.SUCCESS;
+        }
+
+        var killArgs = new List<string> { "shell", "kill", "-9" };
+        killArgs.AddRange(pids);
+        var result = RunAdbCommand(killArgs, TimeSpan.FromMinutes(5));
         if (result.ExitCode != (int)AdbExitCodes.SUCCESS)
         {
             _log.LogError($"Failed to kill process by name ({testName}):{Environment.NewLine}{result}");
@@ -817,6 +855,7 @@ public class AdbRunner
             throw new ArgumentNullException(nameof(localPath));
         }
 
+        HostPathSecurity.ThrowIfUnsafeHostPath(localPath, nameof(localPath));
         string tempFolder = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
         try
         {
@@ -1351,6 +1390,15 @@ public class AdbRunner
 
     public ProcessExecutionResults RunApkInstrumentation(string apkName, string? instrumentationClassName, Dictionary<string, string> args, TimeSpan timeout)
     {
+        if (string.IsNullOrWhiteSpace(apkName))
+        {
+            throw new ArgumentNullException(nameof(apkName));
+        }
+        if (!s_safeAndroidIdentifier.IsMatch(apkName) || apkName.StartsWith("-", StringComparison.Ordinal) || apkName.Length > 255)
+        {
+            throw new ArgumentException("Unsafe APK/package name.", nameof(apkName));
+        }
+
         string displayName = string.IsNullOrEmpty(instrumentationClassName) ? "{default}" : instrumentationClassName;
 
         var adbArgs = new List<string>
@@ -1368,6 +1416,10 @@ public class AdbRunner
         }
         else
         {
+            if (!s_safeAndroidIdentifier.IsMatch(instrumentationClassName) || instrumentationClassName.StartsWith("-", StringComparison.Ordinal) || instrumentationClassName.Length > 255)
+            {
+                throw new ArgumentException("Unsafe instrumentation class name.", nameof(instrumentationClassName));
+            }
             _log.LogInformation($"Starting instrumentation class '{instrumentationClassName}' on {apkName}");
             adbArgs.Add($"{apkName}/{instrumentationClassName}");
         }

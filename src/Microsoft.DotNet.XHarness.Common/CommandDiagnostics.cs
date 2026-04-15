@@ -1,4 +1,4 @@
-﻿// Licensed to the.NET Foundation under one or more agreements.
+// Licensed to the.NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 
 using System;
@@ -8,6 +8,7 @@ using System.IO;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Microsoft.DotNet.XHarness.Common.CLI;
+using Microsoft.DotNet.XHarness.Common.Utilities;
 using Microsoft.Extensions.Logging;
 
 namespace Microsoft.DotNet.XHarness.Common;
@@ -47,6 +48,9 @@ public interface IDiagnosticsData
 /// </summary>
 public class CommandDiagnostics : IDiagnosticsData
 {
+    /// <summary>Upper bound for reading an existing diagnostics JSON file before merge (attacker: multi-GB file DoS).</summary>
+    public const int MaxExistingDiagnosticsJsonFileBytes = 20 * 1024 * 1024;
+
     private readonly ILogger _logger;
     private readonly Stopwatch _timer = Stopwatch.StartNew();
 
@@ -95,6 +99,7 @@ public class CommandDiagnostics : IDiagnosticsData
     /// <param name="targetFile">JSON file where to save the data</param>
     public void SaveToJsonFile(string targetFile)
     {
+        HostPathSecurity.ThrowIfUnsafeHostPath(targetFile, nameof(targetFile));
         _timer.Stop();
 
         var options = new JsonSerializerOptions
@@ -114,7 +119,23 @@ public class CommandDiagnostics : IDiagnosticsData
             // Either append current data to the JSON array or create a new file
             if (File.Exists(targetFile))
             {
-                var data = JsonDocument.Parse(File.ReadAllText(targetFile));
+                var fileLen = new FileInfo(targetFile).Length;
+                if (fileLen > MaxExistingDiagnosticsJsonFileBytes)
+                {
+                    _logger.LogError(
+                        "Refusing to merge diagnostics: existing file exceeds maximum size ({MaxBytes} bytes).",
+                        MaxExistingDiagnosticsJsonFileBytes);
+                    return;
+                }
+
+                string existingJson;
+                using (var sr = new StreamReader(targetFile))
+                {
+                    existingJson = sr.ReadToEnd();
+                }
+
+                JsonPayloadSecurity.ThrowIfJsonStringTooLong(existingJson, nameof(existingJson));
+                using var data = JsonDocument.Parse(existingJson);
 
                 var writerOptions = new JsonWriterOptions
                 {
