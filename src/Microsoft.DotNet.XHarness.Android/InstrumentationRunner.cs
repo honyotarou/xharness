@@ -9,6 +9,7 @@ using System;
 using Microsoft.Extensions.Logging;
 using Microsoft.DotNet.XHarness.Common;
 using Microsoft.DotNet.XHarness.Common.CLI;
+using Microsoft.DotNet.XHarness.Common.Utilities;
 using System.Linq;
 
 namespace Microsoft.DotNet.XHarness.Android;
@@ -158,12 +159,12 @@ public class InstrumentationRunner
 
         if (resultValues.TryGetValue(TestRunSummaryVariableName, out string? testRunSummary))
         {
-            _logger.LogInformation($"Test execution summary:{Environment.NewLine}{testRunSummary}");
+            _logger.LogInformation($"Test execution summary:{Environment.NewLine}{LogInjectionSecurity.Sanitize(testRunSummary)}");
         }
 
         if (resultValues.TryGetValue(ShortMessageVariableName, out string? shortMessage))
         {
-            _logger.LogInformation($"Short message:{Environment.NewLine}{shortMessage}");
+            _logger.LogInformation($"Short message:{Environment.NewLine}{LogInjectionSecurity.Sanitize(shortMessage)}");
             processCrashed = shortMessage.Contains(ProcessCrashedShortMessage);
         }
 
@@ -192,7 +193,8 @@ public class InstrumentationRunner
 
     private bool PullResultXMLs(string apkPackageName, string outputDirectory, IReadOnlyDictionary<string, string> resultValues, List<DiagnosticsFile> producedFiles)
     {
-        bool success = false;
+        // True if any expected result XML could not be pulled (caller maps this to failurePullingFiles).
+        bool anyPullFailed = false;
 
         foreach (string possibleResultKey in s_xmlOutputVariableNames)
         {
@@ -201,7 +203,7 @@ public class InstrumentationRunner
                 continue;
             }
 
-            _logger.LogInformation($"Found XML result file: '{resultFile}'(key: {possibleResultKey})");
+            _logger.LogInformation($"Found XML result file: '{LogInjectionSecurity.Sanitize(resultFile)}'(key: {possibleResultKey})");
 
             try
             {
@@ -216,11 +218,11 @@ public class InstrumentationRunner
             catch (Exception toLog)
             {
                 _logger.LogError(toLog, "Hit error (typically permissions) trying to pull {filePathOnDevice}", resultFile);
-                success = true;
+                anyPullFailed = true;
             }
         }
 
-        return success;
+        return anyPullFailed;
     }
 
     private IReadOnlyDictionary<string, string> ParseInstrumentationOutputs(string stdout)

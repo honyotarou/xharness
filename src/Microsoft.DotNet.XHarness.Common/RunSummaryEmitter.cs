@@ -128,16 +128,22 @@ public static class RunSummaryEmitter
         int? instrumentationExitCode,
         IReadOnlyList<DiagnosticsFile> producedFiles)
     {
-        string? helixJobId = Environment.GetEnvironmentVariable("HELIX_CORRELATION_ID");
-        string? helixWorkItem = Environment.GetEnvironmentVariable("HELIX_WORKITEM_FRIENDLYNAME");
+        string? helixJobId = LogInjectionSecurity.Sanitize(Environment.GetEnvironmentVariable("HELIX_CORRELATION_ID") ?? string.Empty);
+        if (string.IsNullOrEmpty(helixJobId))
+        {
+            helixJobId = null;
+        }
+
+        string? helixWorkItemRaw = Environment.GetEnvironmentVariable("HELIX_WORKITEM_FRIENDLYNAME");
+        string? helixWorkItem = string.IsNullOrEmpty(helixWorkItemRaw) ? null : LogInjectionSecurity.Sanitize(helixWorkItemRaw);
 
         var fileEntries = new List<object>();
         foreach (var file in producedFiles)
         {
             var entry = new Dictionary<string, string>
             {
-                ["name"] = file.Name,
-                ["type"] = file.Type,
+                ["name"] = LogInjectionSecurity.Sanitize(file.Name),
+                ["type"] = LogInjectionSecurity.Sanitize(file.Type),
             };
 
             fileEntries.Add(entry);
@@ -146,10 +152,10 @@ public static class RunSummaryEmitter
         var resultData = new Dictionary<string, object?>
         {
             ["version"] = 1,
-            ["machineName"] = Environment.MachineName,
+            ["machineName"] = LogInjectionSecurity.Sanitize(Environment.MachineName),
             ["exitCode"] = (int)exitCode,
             ["exitCodeName"] = exitCode.ToString(),
-            ["platform"] = platform,
+            ["platform"] = LogInjectionSecurity.Sanitize(platform),
         };
 
         if (!string.IsNullOrEmpty(helixJobId) && !string.IsNullOrEmpty(helixWorkItem))
@@ -168,17 +174,17 @@ public static class RunSummaryEmitter
 
         if (!string.IsNullOrEmpty(deviceName))
         {
-            resultData["device"] = deviceName;
+            resultData["device"] = LogInjectionSecurity.Sanitize(deviceName);
         }
 
         if (!string.IsNullOrEmpty(deviceOsVersion))
         {
-            resultData["deviceOsVersion"] = deviceOsVersion;
+            resultData["deviceOsVersion"] = LogInjectionSecurity.Sanitize(deviceOsVersion);
         }
 
         if (!string.IsNullOrEmpty(architecture))
         {
-            resultData["architecture"] = architecture;
+            resultData["architecture"] = LogInjectionSecurity.Sanitize(architecture);
         }
 
         if (fileEntries.Count > 0)

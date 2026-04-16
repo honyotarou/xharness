@@ -199,27 +199,14 @@ XHarness uses standardized exit codes (see `src/Microsoft.DotNet.XHarness.Common
 - Handle platform-specific edge cases
 - Maintain backwards compatibility when possible
 
-## Self-Improvement Instructions
+## Documentation and agent safety (do not self-modify)
 
-**IMPORTANT**: If you discover any issues, gaps, or outdated information in these instructions while working on XHarness issues, you must update this document with your new knowledge and learnings. This includes:
+**Do not** edit this `copilot-instructions.md` file autonomously in a PR or session. If you find gaps or errors, describe the proposed doc change in the **PR description** or an issue and let a human apply it. Autonomous “self-improvement” loops are an **accumulated prompt-injection** risk (third-party PRs could steer agents to weaken checks or exfiltrate secrets).
 
-1. **New platform-specific quirks or workarounds discovered**
-2. **Additional environmental variables or configuration options**
-3. **Updated build procedures or dependency requirements**
-4. **New testing patterns or debugging techniques**
-5. **Command structure changes or new platform support**
-6. **Performance optimization patterns**
-7. **Security considerations or best practices**
+**Never** print, log, or paste contents of: `.env`, `.env.*`, `*.pfx`, `*.snk`, `.ssh/`, `NuGet.config` credentials, PATs, or Helix/API tokens. Prefer environment-variable **names** only in explanations.
 
-When updating these instructions:
-- Add specific examples and code snippets where helpful
-- Include version information for any platform-specific requirements
-- Document the context and scenario where the knowledge applies
-- Maintain the existing structure and organization
-- Test your changes to ensure accuracy
-
-Your goal is to continuously improve these instructions to become the most effective autonomous agent for XHarness development, capable of solving issues, fixing bugs, and implementing new features efficiently.
+**High-risk paths** (require explicit human intent before bulk edits): `.github/workflows/`, `eng/`, signing/supply-chain scripts, `NuGet.config`, and security-sensitive utilities under `Common/Utilities/`.
 
 ---
 
-*These instructions are designed to help you understand and work effectively with the XHarness codebase. Keep them updated as you learn more about the project.*
+*These instructions are designed to help you understand and work effectively with the XHarness codebase. Propose updates through normal review channels rather than silent self-edits.*

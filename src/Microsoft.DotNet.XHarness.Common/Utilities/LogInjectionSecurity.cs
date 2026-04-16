@@ -29,7 +29,29 @@ public static class LogInjectionSecurity
         s = s.Replace(Common.RunSummaryEmitter.JsonStartMarker, "[XHARNESS_RESULT_START]", StringComparison.Ordinal)
              .Replace(Common.RunSummaryEmitter.JsonEndMarker, "[XHARNESS_RESULT_END]", StringComparison.Ordinal);
 
-        return s;
+        // Defense-in-depth: drop any remaining C0 controls (e.g. ESC variants missed by StripAnsi, or odd logger state).
+        return StripC0ControlsExceptNewlineTab(s);
+    }
+
+    private static string StripC0ControlsExceptNewlineTab(string s)
+    {
+        if (string.IsNullOrEmpty(s))
+        {
+            return s;
+        }
+
+        var sb = new System.Text.StringBuilder(s.Length);
+        foreach (char c in s)
+        {
+            if (c < 0x20 && c != '\n' && c != '\r' && c != '\t')
+            {
+                continue;
+            }
+
+            sb.Append(c);
+        }
+
+        return sb.ToString();
     }
 
     private static string StripAnsi(string input)

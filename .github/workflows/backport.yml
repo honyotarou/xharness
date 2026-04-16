@@ -14,4 +14,5 @@ permissions:
 
 jobs:
   backport:
-    uses: dotnet/arcade/.github/workflows/backport-base.yml@main
+    # Pinned SHA (not a branch ref) per supply-chain hardening; bump when arcade backport workflow changes.
+    uses: dotnet/arcade/.github/workflows/backport-base.yml@8e46fac3b7212793291822f5cc99feeaec6f7e9e

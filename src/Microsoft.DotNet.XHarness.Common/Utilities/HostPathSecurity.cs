@@ -2,6 +2,8 @@
 // The .NET Foundation licenses this file to you under the MIT license.
 // See the LICENSE file in the project root for more information.
 
+#nullable enable
+
 using System;
 using System.IO;
 using System.Runtime.InteropServices;
@@ -74,14 +76,18 @@ public static class HostPathSecurity
         {
             return ResolvePathSymlinksWithOptionalTail(path);
         }
-        catch (IOException)
+        catch (IOException ex)
         {
+            throw new InvalidOperationException(
+                "Symlink resolution failed; cannot verify path containment. Refusing fail-open fallback.",
+                ex);
         }
-        catch (UnauthorizedAccessException)
+        catch (UnauthorizedAccessException ex)
         {
+            throw new InvalidOperationException(
+                "Symlink resolution failed; cannot verify path containment. Refusing fail-open fallback.",
+                ex);
         }
-
-        return path;
     }
 
     private static string ResolvePathSymlinksWithOptionalTail(string path)

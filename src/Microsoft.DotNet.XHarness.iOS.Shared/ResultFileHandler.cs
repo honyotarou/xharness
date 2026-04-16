@@ -297,11 +297,11 @@ public class ResultFileHandler : IResultFileHandler
         {
             if (deleteTempCrashListFile)
             {
-                try { File.Delete(tempCrashListFile); } catch { }
+                SafeFileDelete.TryDelete(tempCrashListFile, msg => _mainLog.WriteLine(msg));
             }
             if (deleteCrashReportContent && crashReportContent != null)
             {
-                try { File.Delete(crashReportContent); } catch { }
+                SafeFileDelete.TryDelete(crashReportContent, msg => _mainLog.WriteLine(msg));
             }
         }
     }

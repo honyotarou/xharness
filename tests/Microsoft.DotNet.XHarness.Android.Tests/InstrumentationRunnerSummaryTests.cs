@@ -9,6 +9,7 @@ using System.Collections.Generic;
 using System.Text.Json;
 using Microsoft.DotNet.XHarness.Common;
 using Microsoft.DotNet.XHarness.Common.CLI;
+using Microsoft.DotNet.XHarness.Common.Utilities;
 using Microsoft.Extensions.Logging;
 using Moq;
 using Xunit;
@@ -34,7 +35,9 @@ public class InstrumentationRunnerSummaryTests
                 It.IsAny<Func<It.IsAnyType, Exception?, string>>()))
             .Callback((LogLevel level, EventId eventId, object state, Exception? ex, Delegate formatter) =>
             {
-                _loggedMessages.Add(state?.ToString() ?? "");
+                // Prefer formatter output (matches real logging); state.ToString() can omit ANSI-stripped text.
+                var rendered = formatter.DynamicInvoke(state, ex) as string ?? state?.ToString() ?? string.Empty;
+                _loggedMessages.Add(rendered);
             });
     }
 
@@ -155,6 +158,36 @@ public class InstrumentationRunnerSummaryTests
 
         var json = ExtractJsonFromLogs();
         Assert.Equal(1, json.GetProperty("version").GetInt32());
+    }
+
+    [Fact]
+    public void EmitJsonResultBlock_SanitizesDeviceName_InJsonPayload()
+    {
+        // Exercise EmitJsonResultBlock directly so the assertion is not coupled to ILogger/Moq state formatting.
+        var log = new List<string>();
+        var device = "\u001b[31mred" + RunSummaryEmitter.JsonStartMarker;
+
+        RunSummaryEmitter.EmitJsonResultBlock(
+            log.Add,
+            ExitCode.SUCCESS,
+            "android",
+            device,
+            null,
+            null,
+            null,
+            new List<DiagnosticsFile>());
+
+        Assert.Single(log);
+        var jsonMessage = log[0];
+        var start = jsonMessage.IndexOf("<<XHARNESS_RESULT_START>>", StringComparison.Ordinal) + "<<XHARNESS_RESULT_START>>".Length;
+        var end = jsonMessage.IndexOf("<<XHARNESS_RESULT_END>>", StringComparison.Ordinal);
+        var jsonStr = jsonMessage.Substring(start, end - start).Trim();
+        using var doc = JsonDocument.Parse(jsonStr);
+        var deviceOut = doc.RootElement.GetProperty("device").GetString();
+        Assert.NotNull(deviceOut);
+        var expectedDevice = LogInjectionSecurity.Sanitize(device);
+        Assert.Equal(expectedDevice, deviceOut);
+        Assert.DoesNotContain(RunSummaryEmitter.JsonStartMarker, deviceOut);
     }
 
     private JsonElement ExtractJsonFromLogs()

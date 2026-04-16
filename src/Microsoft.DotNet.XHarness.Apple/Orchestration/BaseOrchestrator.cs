@@ -13,6 +13,7 @@ using Microsoft.DotNet.XHarness.Common;
 using Microsoft.DotNet.XHarness.Common.CLI;
 using Microsoft.DotNet.XHarness.Common.Execution;
 using Microsoft.DotNet.XHarness.Common.Logging;
+using Microsoft.DotNet.XHarness.Common.Utilities;
 using Microsoft.DotNet.XHarness.iOS.Shared;
 using Microsoft.DotNet.XHarness.iOS.Shared.Hardware;
 using Microsoft.DotNet.XHarness.iOS.Shared.Logging;
@@ -108,7 +109,7 @@ public abstract class BaseOrchestrator : IDisposable
         }
         catch (OperationCanceledException e)
         {
-            _logger.LogDebug(e.ToString());
+            _logger.LogDebug(ExceptionLogFormatter.FormatSummary(e));
             exitCode = ExitCode.APP_LAUNCH_TIMEOUT;
         }
         finally
@@ -282,7 +283,7 @@ public abstract class BaseOrchestrator : IDisposable
             }
             catch (Exception e)
             {
-                _logger.LogError($"Failed to reset simulator: " + Environment.NewLine + e);
+                _logger.LogError($"Failed to reset simulator: {ExceptionLogFormatter.FormatSummary(e)}");
                 return ExitCode.SIMULATOR_FAILURE;
             }
         }
@@ -454,7 +455,7 @@ public abstract class BaseOrchestrator : IDisposable
         }
         catch (Exception e)
         {
-            _logger.LogError($"Failed to install the app bundle:{Environment.NewLine}{e}");
+            _logger.LogError($"Failed to install the app bundle: {ExceptionLogFormatter.FormatSummary(e)}");
             return ExitCode.PACKAGE_INSTALLATION_FAILURE;
         }
 

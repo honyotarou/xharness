@@ -15,5 +15,14 @@ public class LogInjectionSecurityTests
         Assert.Contains("[XHARNESS_RESULT_START]", s);
         Assert.Contains("\\r", s);
     }
+
+    [Fact]
+    public void Sanitize_StripsSgrColorSequence_BeforeMarker()
+    {
+        var raw = "\u001b[31mred" + Microsoft.DotNet.XHarness.Common.RunSummaryEmitter.JsonStartMarker;
+        var s = LogInjectionSecurity.Sanitize(raw);
+        Assert.Equal(-1, s.IndexOf('\u001b'));
+        Assert.DoesNotContain(Microsoft.DotNet.XHarness.Common.RunSummaryEmitter.JsonStartMarker, s);
+    }
 }
 
